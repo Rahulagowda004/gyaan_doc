@@ -3,6 +3,7 @@ from datetime import datetime
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
+from langchain_ollama import OllamaEmbeddings
 
 def available_pdfs() -> list:
     """
@@ -11,7 +12,9 @@ def available_pdfs() -> list:
     pdf_files = [f for f in os.listdir('R:/gyaan_doc/pdfs') if f.endswith('.pdf')]
     return pdf_files
 
-def retriever(pdfs: list, embeddings):
+embeddings = OllamaEmbeddings(model = "all-minilm:latest")
+
+def retriever(pdfs: list) -> object:
     
     for pdf in pdfs:
         pdf_loader = PyPDFLoader(pdf)
@@ -29,8 +32,8 @@ def retriever(pdfs: list, embeddings):
     
     pages_split = text_splitter.split_documents(pages) 
 
-    persist_directory = r""
-    collection_name = ""
+    persist_directory = r"embeddings"
+    collection_name = "pdf_embeddings"
 
     if not os.path.exists(persist_directory):
         os.makedirs(persist_directory)
