@@ -174,7 +174,7 @@ app = graph.compile(checkpointer=memory)
 ####pinging to the graph
 config = {"configurable": {"thread_id": "1"}}
 
-user_input = "what is summary of the topic machine learning in the ai engineering pdf"
+user_input = "what is self attention"
 
 events = app.stream(
     {"messages": [{"role": "user", "content": user_input}]},
