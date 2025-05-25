@@ -258,7 +258,9 @@ config = {"configurable": {"thread_id": "1"}}
 
 # Example usages
 # First try summarization
-user_input = "what is the background of rahul a gowda"
+# user_input = "what is the background of rahul a gowda"
+# user_input = "summary of the pdf"
+user_input = "explain about the architecture"
 print("\n===== Testing summarization =====")
 print(f"User query: {user_input}")
 events = app.stream(
