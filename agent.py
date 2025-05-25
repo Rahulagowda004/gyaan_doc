@@ -20,11 +20,10 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
 # Our Embedding Model - has to also be compatible with the LLM
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
-memory = MemorySaver()
-
 pdf_files = [f for f in os.listdir('R:/gyaan_doc/pdfs') if f.endswith('.pdf')]
 
 for pdf_file in pdf_files:
+    print(f"Processing PDF: {pdf_file}")
     pdf_loader = PyPDFLoader(os.path.join("pdfs", pdf_file)) # This loads the PDF
 
 try:
@@ -36,10 +35,9 @@ except Exception as e:
 
 # Chunking Process
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200
+    chunk_size=16000,
+    chunk_overlap=750
 )
-
 
 pages_split = text_splitter.split_documents(pages) # We now apply this to our pages
 
@@ -105,7 +103,7 @@ def should_continue(state: AgentState):
 
 
 system_prompt = """
-You are an intelligent AI assistant that primarily provides answers based on content retrieved using the retriever tool. If the user asks anything related to a PDF, you must always use the retriever tool to fetch and reference information from the PDF before responding. While you can use general knowledge when needed, retrieval-based content should take priority whenever available.
+You are an intelligent AI assistant that provides answers based solely on the content retrieved using the retriever tool. If the user asks anything related to a PDF, always use the retriever tool to fetch and reference information from the PDF before answering. Do not rely on prior knowledge or assumptions—respond strictly based on retrieved content.
 """
 
 tools_dict = {our_tool.name: our_tool for our_tool in tools} # Creating a dictionary of our tools
@@ -143,6 +141,7 @@ def take_action(state: AgentState) -> AgentState:
     print("Tools Execution Complete. Back to the model!")
     return {'messages': results}
 
+memory = MemorySaver()
 
 graph = StateGraph(AgentState)
 graph.add_node("llm", call_llm)
