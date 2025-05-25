@@ -112,7 +112,7 @@ def summarization(state: State) -> State:
     
     print(f"this is how the state looks like: {state["messages"] + [AIMessage(content=response['output_text'])]}")
     
-    return {"messages": state["messages"] + [AIMessage(content=response['output_text'])]}
+    return {"messages": [AIMessage(content=response['output_text'])]}
 
 
 ####rag agent
@@ -126,13 +126,11 @@ def rag(state: State) -> State:
     )
     retrieval_chain = create_retrieval_chain(retriever_instance, combine_docs_chain)
     
-    last_message = state["messages"][-1] if state["messages"] else None
-    
     results = retrieval_chain.invoke({
-        "input": last_message.content,
+        "input": state["messages"],
     })
     
-    return {'messages': AIMessage(content= results)}
+    return {'messages': [AIMessage(content= results)]}
 
 
 ####function helps to decide whether to go with rag or summarization
