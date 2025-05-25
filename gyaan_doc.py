@@ -1,65 +1,11 @@
 import streamlit as st
 import os
-from pathlib import Path
-import asyncio
-import json
-import aiofiles
-from datetime import datetime
-import time
 import logging
-# from document_processor import DocumentProcessor # Removed
-# from custom_embeddings import CustomEmbedding # Potentially unused if LightRAG is removed
-# from custom_llm import get_full_response # Potentially unused if LightRAG is removed
-# from lightrag import LightRAG, QueryParam # Potentially unused if LightRAG is removed
-# from context_manager import ContextManager # Potentially unused if LightRAG is removed
 from PIL import Image
-import os
-import hashlib
-import altair as alt
-import pandas as pd
-
-# Authentication functions
-def get_url_params():
-    """Extract URL query parameters from st.query_params"""
-    # Get query parameters using the newer API
-    query_params = st.query_params
-    
-    # With st.query_params, values are direct values, not lists
-    user = query_params.get("user", "")
-    token = query_params.get("token", "")
-    timestamp = query_params.get("ts", "")
-    
-    # Log the extracted parameters for debugging
-    print(f"Extracted URL params - user: {user}, token: {token}, timestamp: {timestamp}")
-    
-    return user, token, timestamp
-
-def validate_token(username, token, timestamp):
-    """Validate the token matches the username"""
-    if not username or not token:
-        print(f"Missing authentication parameters - user: {username}, token: {token}, timestamp: {timestamp}")
-        return False
-    try:
-        # Remove timestamp/expiration check for static token
-        secret_key = "GYAAN_SECRET_KEY_2025"
-        token_string = f"{username}:{secret_key}"
-        expected_token = hashlib.sha256(token_string.encode()).hexdigest()
-        is_valid = token == expected_token
-        print(f"Token validation - match: {is_valid}")
-        print(f"Expected token: {expected_token}")
-        print(f"Provided token: {token}")
-        return is_valid
-    except Exception as e:
-        print(f"Token validation error: {str(e)}")
-        return False
-
-# Check authentication at the beginning
-user, token, timestamp = get_url_params()
-is_authenticated = validate_token(user, token, timestamp)
-
-if not is_authenticated:
-    st.error("⚠️ Authentication required. Please access this application through the main portal.")
-    st.stop()
+import uuid # Added for unique thread IDs
+from agent import app as agent_app # Added for LangGraph agent
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage # Added
+from typing import Sequence # Added for type hinting
 
 # Configure logging
 logging.basicConfig(
@@ -69,21 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constants
-DOCUMENTS_DIR = "documents" # This might still be used or can be removed if agent.py handles all doc locations
-# PROCESSED_DOCS_FILE = "processed_docs.json" # Removed
-UPLOAD_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"] # May be removed if upload is fully removed
-EMBEDDINGS_DIM = 4096 # Potentially unused
-MAX_RETRIES = 3 # Potentially unused
-BASE_TIMEOUT = 2400  # 40 minutes # Potentially unused
-
-# Configure Streamlit page
-st.set_page_config(
-    page_title="Gyaan AI",
-    page_icon="🔆",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
+PDFS_DIR = "pdfs" # Used for saving uploaded files
 ASSETS_DIR = "assets"
 
 # Custom CSS for improved styling
@@ -224,292 +156,103 @@ st.markdown("""
 def init_session_state():
     """Initialize Streamlit session state variables."""
     if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = {}
-    # if 'rag_instances' not in st.session_state: # Removed
-    #     st.session_state.rag_instances = {} # Removed
-    if 'selected_doc' not in st.session_state:
-        st.session_state.selected_doc = None
-    # if 'processing_status' not in st.session_state: # Removed - tied to old processing
-    #     st.session_state.processing_status = {} # Removed
+        st.session_state.chat_history = []  # Global chat history
+    
+    if 'agent_thread_id' not in st.session_state: # Added for agent conversation threading
+        st.session_state.agent_thread_id = str(uuid.uuid4())
 
+# Create necessary directories
 def initialize_directories():
     """Create necessary directories if they don't exist."""
-    try:
-        os.makedirs(DOCUMENTS_DIR, exist_ok=True) # Keep if DOCUMENTS_DIR is still relevant
-        os.makedirs("pdfs", exist_ok=True) # Ensure pdfs directory exists for uploads
-        # if not os.path.exists(PROCESSED_DOCS_FILE): # Removed
-        #     with open(PROCESSED_DOCS_FILE, \'w\') as f: # Removed
-        #         json.dump([], f) # Removed
-        logger.info("Directories initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing directories: {str(e)}")
-        raise
+    if not os.path.exists(PDFS_DIR):
+        os.makedirs(PDFS_DIR)
+    if not os.path.exists(ASSETS_DIR): # Ensure assets dir is also checked/created if needed by app
+        os.makedirs(ASSETS_DIR)
+
 
 def get_user_stats():
     """Get statistics for the platform: total answers, total questions, and processed documents."""
-    processed_docs_count = 0 # Simplified as PROCESSED_DOCS_FILE is removed
-    # if os.path.exists(PROCESSED_DOCS_FILE): # Removed
-    #     try: # Removed
-    #         with open(PROCESSED_DOCS_FILE, 'r') as f: # Removed
-    #             docs = json.load(f) # Removed
-    #         processed_docs_count = len(docs) # Removed
-    #     except Exception as e: # Removed
-    #         logger.error(f"Error reading processed docs file for stats: {str(e)}") # Removed
-    #         pass  # Continue if stats can't be loaded # Removed
-
+    processed_docs_count = 0 # Simplified as PROCESSED_DOCS_FILE is removed; agent handles processing.
+                             # This count might need a new source if "processed by agent" is to be tracked.
+    
     total_questions = 0
     total_answers = 0
     if 'chat_history' in st.session_state:
-        for doc_name, history in st.session_state.chat_history.items():
-            for message in history:
-                if message.get("role") == "user":
-                    total_questions += 1
-                elif message.get("role") == "assistant":
-                    total_answers += 1
+        # Chat history is now a list of dicts
+        for message in st.session_state.chat_history:
+            if message.get("role") == "user":
+                total_questions += 1
+            elif message.get("role") == "assistant":
+                total_answers += 1
     
-    # Returns in the order they will appear on the chart: Answers, Questions, Documents
     return total_answers, total_questions, processed_docs_count
 
-def create_stats_chart():
-    """Create a bar chart with platform statistics."""
-    total_answers, total_questions, processed_docs_count = get_user_stats()
+# New function to interact with the LangGraph agent
+def get_agent_response(current_chat_history: list[dict], thread_id: str) -> str:
+    """
+    Gets a response from the LangGraph agent using the current chat history and a thread_id.
+    """
+    messages_for_agent: list[BaseMessage] = []
+    for entry in current_chat_history:
+        content = entry["content"]
+        if not isinstance(content, str): # Ensure content is string
+            content = str(content)
 
-    categories = ['Answers', 'Questions', 'Documents']
-    counts = [total_answers, total_questions, processed_docs_count]
+        if entry["role"] == "user":
+            messages_for_agent.append(HumanMessage(content=content))
+        elif entry["role"] == "assistant":
+            messages_for_agent.append(AIMessage(content=content))
+
+    if not messages_for_agent or not isinstance(messages_for_agent[-1], HumanMessage):
+        logger.error("Agent called without a final HumanMessage in history.")
+        # This can happen if history is empty and a system tries to get a response.
+        # For user-initiated chat, history will have at least one user message.
+        return "Error: Agent requires a user prompt to respond."
+
+    input_data = {"messages": messages_for_agent}
+    # agent_config was imported from agent.py, but we need a session-specific thread_id
+    current_agent_config = {"configurable": {"thread_id": thread_id}}
     
-    # Color scheme: Answers (Red), Questions (Green), Documents (Blue)
-    color_domain = ['Answers', 'Questions', 'Documents']
-    color_range = ['#C44E52', '#55A868', '#4C72B0']
-
-    data = pd.DataFrame({
-        'Category': categories,
-        'Count': counts
-    })
-
-    chart = alt.Chart(data).mark_bar().encode(
-        x=alt.X('Category', title=None, sort=None),  # sort=None to maintain DataFrame order
-        y=alt.Y('Count', title=None, axis=alt.Axis(format='d')),
-        color=alt.Color('Category', legend=None,
-                      scale=alt.Scale(domain=color_domain, range=color_range)),
-        tooltip=['Category', 'Count']
-    ).properties(
-        title='Platform Statistics',
-        height=200
-    ).configure_title(
-        fontSize=14,
-        anchor='middle'
-    )
-    return chart
-
-# def load_processed_docs(): # Removed
-#     """Load the list of processed documents.""" # Removed
-#     try: # Removed
-#         if os.path.exists(PROCESSED_DOCS_FILE): # Removed
-#             with open(PROCESSED_DOCS_FILE, 'r') as f: # Removed
-#                 docs = json.load(f) # Removed
-#             logger.info(f"Loaded {len(docs)} processed documents") # Removed
-#             return docs # Removed
-#         return [] # Removed
-#     except Exception as e: # Removed
-#         logger.error(f"Error loading processed documents: {str(e)}") # Removed
-#         return [] # Removed
-
-# def save_processed_doc(doc_info): # Removed
-#     """Save information about a processed document.""" # Removed
-#     try: # Removed
-#         docs = load_processed_docs() # Removed
-#         if any(doc['name'] == doc_info['name'] for doc in docs): # Removed
-#             logger.warning(f"Document {doc_info['name']} already exists") # Removed
-#             return False # Removed
-#         docs.append(doc_info) # Removed
-#         with open(PROCESSED_DOCS_FILE, 'w') as f: # Removed
-#             json.dump(docs, f) # Removed
-#         logger.info(f"Document {doc_info['name']} saved successfully") # Removed
-#         return True # Removed
-#     except Exception as e: # Removed
-#         logger.error(f"Error saving document info: {str(e)}") # Removed
-#         raise # Removed
-
-
-# async def process_document_with_retry(rag, text, progress_bar, status_placeholder): # Removed
-#     """Process document with retry logic and increasing timeouts.""" # Removed
-#     for attempt in range(MAX_RETRIES): # Removed
-#         timeout = BASE_TIMEOUT * (attempt + 1) # Removed
-#         try: # Removed
-#             print(f"\\n=== Processing Attempt {attempt + 1}/{MAX_RETRIES} ===") # Removed
-#             print(f"Timeout: {timeout} seconds") # Removed
+    final_ai_response = "Sorry, I couldn't get a response from the agent at this time."
+    
+    try:
+        logger.info(f"Sending to agent (thread_id: {thread_id}): {len(messages_for_agent)} messages.")
+        
+        for event in agent_app.stream(input_data, current_agent_config, stream_mode="values"):
+            if event and "messages" in event and event["messages"]:
+                last_message = event["messages"][-1]
+                if isinstance(last_message, AIMessage):
+                    if not hasattr(last_message, 'tool_calls') or not last_message.tool_calls:
+                        final_ai_response = last_message.content
+                        logger.info(f"Agent final AIMessage content (thread_id: {thread_id}): {final_ai_response[:100]}...") # Log snippet
+                    # else: # Intermediate AIMessage with tool_calls, stream continues
+                        # logger.debug(f"Agent intermediate AIMessage with tool_calls (thread_id: {thread_id})")
+        
+        logger.info(f"Received from agent (thread_id: {thread_id}): {final_ai_response[:100]}...")
             
-#             status_placeholder.info(f"Processing attempt {attempt + 1}/{MAX_RETRIES} (timeout: {timeout}s)") # Removed
-#             result = await asyncio.wait_for( # Removed
-#                 rag.ainsert(text), # Removed
-#                 timeout=timeout # Removed
-#             ) # Removed
-#             logger.info("Document processed successfully") # Removed
-#             print("Document processing successful") # Removed
-#             return result # Removed
-#         except asyncio.TimeoutError: # Removed
-#             if attempt < MAX_RETRIES - 1: # Removed
-#                 logger.warning(f"Processing timeout on attempt {attempt + 1}") # Removed
-#                 print(f"Timeout occurred - Retrying...") # Removed
-#                 status_placeholder.warning(f"Processing timeout, attempt {attempt + 1} of {MAX_RETRIES}. Increasing timeout and retrying...") # Removed
-#                 await asyncio.sleep(5) # Removed
-#             else: # Removed
-#                 error_msg = "Document processing failed after maximum retries" # Removed
-#                 logger.error(error_msg) # Removed
-#                 print(f"=== Error ===\\n{error_msg}") # Removed
-#                 raise Exception(error_msg) # Removed
-#         except Exception as e: # Removed
-#             if attempt < MAX_RETRIES - 1: # Removed
-#                 logger.warning(f"Processing error on attempt {attempt + 1}: {str(e)}") # Removed
-#                 print(f"Error occurred: {str(e)} - Retrying...") # Removed
-#                 status_placeholder.warning(f"Processing error: {str(e)}. Retrying...") # Removed
-#                 await asyncio.sleep(5) # Removed
-#             else: # Removed
-#                 error_msg = f"Document processing failed after maximum retries: {str(e)}" # Removed
-#                 logger.error(error_msg) # Removed
-#                 print(f"=== Error ===\\n{error_msg}") # Removed
-#                 raise Exception(error_msg) # Removed
+    except Exception as e:
+        logger.error(f"Error interacting with LangGraph agent (thread_id: {thread_id}): {str(e)}", exc_info=True)
+        final_ai_response = f"An error occurred while trying to reach the agent: {str(e)}"
+        
+    return final_ai_response
 
-# async def process_document(uploaded_file, progress_bar, status_placeholder): # Removed
-#     """Process an uploaded document and create LightRAG instance.""" # Removed
-#     try: # Removed
-#         logger.info(f"Starting to process document: {uploaded_file.name}") # Removed
-#         print(f"\\n=== Processing Document ===\\nFile: {uploaded_file.name}") # Removed
-        
-#         # Update progress # Removed
-#         progress_bar.progress(10, text="Reading file...") # Removed
-        
-#         # Read file content # Removed
-#         content = uploaded_file.read() # Removed
-#         logger.info(f"File read successfully, size: {len(content)} bytes") # Removed
-#         print(f"File read successfully - Size: {len(content)} bytes") # Removed
-        
-#         # Process document # Removed
-#         progress_bar.progress(20, text="Extracting text...") # Removed
-#         # doc_processor = DocumentProcessor() # This was the source of the error, DocumentProcessor is not defined # Removed
-#         # extracted_text = doc_processor.process_document(content, uploaded_file.name) # Removed
-#         extracted_text = "Dummy text, processing removed" # Placeholder if needed, but function is removed # Removed
-#         logger.info(f"Text extracted successfully, length: {len(extracted_text)}") # Removed
-#         print(f"Text extracted - Length: {len(extracted_text)} characters") # Removed
-        
-#         # Save processed document # Removed
-#         doc_path = os.path.join(DOCUMENTS_DIR, uploaded_file.name) # Removed
-#         with open(doc_path, 'wb') as f: # Removed
-#             f.write(content) # Removed
-        
-#         # Save text content # Removed
-#         text_path = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}.txt") # Removed
-#         async with aiofiles.open(text_path, mode='w') as f: # Removed
-#             await f.write(extracted_text) # Removed
-#         logger.info(f"Document saved to: {doc_path}") # Removed
-#         print(f"Document saved to: {doc_path}") # Removed
-        
-#         # Initialize LightRAG # Removed
-#         progress_bar.progress(40, text="Initializing LightRAG...") # Removed
-#         doc_dir = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}_rag") # Removed
-#         os.makedirs(doc_dir, exist_ok=True) # Removed
-#         rag = initialize_lightrag(doc_dir) # Removed
-        
-#         # Process document with LightRAG # Removed
-#         progress_bar.progress(60, text="Processing with LightRAG...") # Removed
-#         status_placeholder.info("Starting document processing with LightRAG. This may take several minutes...") # Removed
-        
-#         await process_document_with_retry(rag, extracted_text, progress_bar, status_placeholder) # Removed
-        
-#         # Save document info # Removed
-#         progress_bar.progress(80, text="Saving document information...") # Removed
-#         doc_info = { # Removed
-#             "name": uploaded_file.name, # Removed
-#             "path": doc_path, # Removed
-#             "text_path": text_path, # Removed
-#             "rag_dir": doc_dir, # Removed
-#             "processed_date": datetime.now().isoformat() # Removed
-#         } # Removed
-        
-#         if not save_processed_doc(doc_info): # Removed
-#             return False, "Document already exists!" # Removed
-        
-#         # Store RAG instance # Removed
-#         st.session_state.rag_instances[uploaded_file.name] = rag # Removed
-        
-#         progress_bar.progress(100, text="Complete!") # Removed
-#         logger.info(f"Document {uploaded_file.name} processed successfully") # Removed
-#         print("Document processing completed successfully") # Removed
-#         return True, "Document processed successfully!" # Removed
-        
-#     except Exception as e: # Removed
-#         error_msg = f"Error processing document: {str(e)}" # Removed
-#         logger.error(error_msg) # Removed
-#         print(f"\\n=== Error ===\\n{error_msg}") # Removed
-#         return False, error_msg # Removed
-
-# def initialize_lightrag(working_dir): # Removed
-#     """Initialize LightRAG with optimized parameters""" # Removed
-#     try: # Removed
-#         logger.info(f"Initializing LightRAG in directory: {working_dir}") # Removed
-#         print(f"\\n=== Initializing LightRAG ===\\nWorking Directory: {working_dir}") # Removed
-        
-#         # custom_embed = CustomEmbedding(timeout=BASE_TIMEOUT) # Removed - CustomEmbedding not defined
-#         # custom_embed.embedding_dim = EMBEDDINGS_DIM  # Ensure embedding_dim is accessible # Removed
-        
-#         # rag = LightRAG( # Removed - LightRAG not defined
-#         #     working_dir=working_dir, # Removed
-#         #     llm_model_func=get_full_response, # Removed - get_full_response not defined
-#         #     embedding_func=custom_embed, # Removed
-#         #     llm_model_name="ibnzterrell/Meta-Llama-3.3-70B-Instruct-AWQ-INT4", # Removed
-#         #     node2vec_params={ # Removed
-#         #         "dimensions": EMBEDDINGS_DIM, # Removed
-#         #         "num_walks": 15, # Removed
-#         #         "walk_length": 50, # Removed
-#         #         "window_size": 3, # Removed
-#         #         "iterations": 4, # Removed
-#         #         "random_seed": 3, # Removed
-#         #     }, # Removed
-#         #     vector_db_storage_cls_kwargs={ # Removed
-#         #         "embedding_dim": EMBEDDINGS_DIM, # Removed
-#         #     }, # Removed
-#         # ) # Removed
-#         logger.info("LightRAG initialized successfully (stubbed)") # Removed
-#         print("LightRAG initialization successful (stubbed)") # Removed
-#         # return rag # Removed
-#         return None # Placeholder since function is removed # Removed
-#     except Exception as e: # Removed
-#         error_msg = f"Error initializing LightRAG: {str(e)}" # Removed
-#         logger.error(error_msg) # Removed
-#         print(f"=== Error ===\\n{error_msg}") # Removed
-#         raise # Removed
-
-
-# async def generate_response(prompt, selected_doc, conversation_history=None): # Removed
-#     """Generate response using enhanced context retrieval""" # Removed
-#     try: # Removed
-#         logger.info(f"Generating response for document: {selected_doc['name']} (stubbed)") # Removed
-#         # This function relies on LightRAG and related components which are being removed. # Removed
-#         # For now, it will return a placeholder response. # Removed
-#         # You will need to integrate with agent.py for actual responses. # Removed
-#         await asyncio.sleep(1) # Simulate async work # Removed
-#         return f"Response generation for '{prompt}' on doc '{selected_doc['name']}' is not implemented in gyaan_doc.py anymore." # Removed
-        
-#     except Exception as e: # Removed
-#         error_msg = f"Error generating response: {str(e)}" # Removed
-#         logger.error(error_msg) # Removed
-#         print(f"\\n=== Error ===\\n{error_msg}") # Removed
-#         return error_msg # Removed
 def main():
     # Initialize
     init_session_state()
     initialize_directories()
     
-    # Add your CSS here
-    
     # Sidebar
     with st.sidebar:
-        st.markdown("### 📊 Platform Statistics")
-        try:
-            stats_chart = create_stats_chart()
-            st.altair_chart(stats_chart, use_container_width=True)
-        except Exception as e:
-            st.error(f"Could not display statistics: {str(e)}")
+        # Platform Statistics as a dropdown (expander)
+        with st.expander("📊 Platform Statistics", expanded=True):
+            try:
+                total_answers, total_questions, processed_docs_count = get_user_stats()
+                st.markdown(f"**Total Answers:** {total_answers}")
+                st.markdown(f"**Total Questions:** {total_questions}")
+                st.markdown(f"**Processed Documents:** {processed_docs_count}")
+            except Exception as e:
+                st.error(f"Could not display statistics: {str(e)}")
+        
         st.markdown("---") # Add a visual separator
 
         st.markdown("### 📚 Document Manager")
@@ -587,18 +330,11 @@ def main():
             # Generate and display response
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing document and generating response..."):
-                    # response = asyncio.run( # Call to generate_response is removed
-                    #     generate_response( 
-                    #         prompt, 
-                    #         st.session_state.selected_doc,
-                    #         st.session_state.chat_history[current_doc]
-                    #     )
-                    # )
-                    response = "Response generation has been moved to the agent." # Placeholder
-                    st.markdown(response)
+                    response_text = get_agent_response(st.session_state.chat_history, st.session_state.agent_thread_id)
+                    st.markdown(response_text)
                     st.session_state.chat_history[current_doc].append({
                         "role": "assistant",
-                        "content": response
+                        "content": response_text
                     })
     
     # # Footer

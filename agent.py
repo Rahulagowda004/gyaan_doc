@@ -166,21 +166,43 @@ graph.set_entry_point("llm")
 
 app = graph.compile(checkpointer=memory)
 
-config = {"configurable": {"thread_id": "1"}}
-def running_agent():
-    while True:
-        user_input = input("Enter your query (or type 'exit' to quit): ")
-        if user_input.lower() == 'exit':
-            break
+# config = {"configurable": {"thread_id": "1"}}
 
-        print("\n===== Testing summarization =====")
-        print(f"User query: {user_input}")
-        events = app.stream(
-            {"messages": [HumanMessage(content=user_input)]},
-            config,
-            stream_mode="values",
-        )
-        for event in events:
-            event["messages"][-1].pretty_print()
+# def running_agent():
+#     while True:
+#         user_input = input("Enter your query (or type 'exit' to quit): ")
+#         if user_input.lower() == 'exit':
+#             break
+# 
+#         print("\n===== Testing summarization =====")
+#         print(f"User query: {user_input}")
+#         events = app.stream(
+#             {"messages": [HumanMessage(content=user_input)]},
+#             config,
+#             stream_mode="values",
+#         )
+#         for event in events:
+#             event["messages"][-1].pretty_print()
 
-running_agent()
+# running_agent() # Commented out to prevent execution on import
+
+if __name__ == "__main__":
+    # This block will only execute if agent.py is run directly, not when imported.
+    config = {"configurable": {"thread_id": "1"}}
+    def main_test_loop():
+        while True:
+            user_input = input("Enter your query (or type 'exit' to quit): ")
+            if user_input.lower() == 'exit':
+                break
+
+            print("\n===== Agent Test Output =====")
+            print(f"User query: {user_input}")
+            events = app.stream(
+                {"messages": [HumanMessage(content=user_input)]},
+                config,
+                stream_mode="values",
+            )
+            for event in events:
+                if event and "messages" in event and event["messages"]:
+                    event["messages"][-1].pretty_print()
+    main_test_loop()
