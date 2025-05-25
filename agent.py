@@ -1,3 +1,4 @@
+import os
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_core.prompts import PromptTemplate
@@ -86,10 +87,6 @@ def orchestrator(state: State) -> State:
     print(f"Query type: {query_type}")
     print(f"Selected PDFs: {selected_pdfs}")
     
-    # Store the selected PDFs in the state for later use
-    new_state = state.copy()
-    new_state["pdf_query"] = selected_pdfs
-    
     # Add the routing decision as an AI message
     return {"messages": state["messages"] + [AIMessage(content=query_type)]}
 
@@ -97,7 +94,7 @@ def orchestrator(state: State) -> State:
 def summarization(state: State) -> State:
     
     for pdf in state.get["pdfs",[]]:
-        loader = PyPDFLoader(Path(pdf))
+        loader = PyPDFLoader(Path(os.path.join("R:/gyaan_doc/pdfs", pdf)))
         docs = loader.load_and_split()
     
     split_docs = RecursiveCharacterTextSplitter(chunk_size = 15000, chunk_overlap=500).split_documents(docs)
@@ -126,8 +123,10 @@ def rag(state: State) -> State:
     )
     retrieval_chain = create_retrieval_chain(retriever_instance, combine_docs_chain)
     
+    messages = state["messages"]
+    last_message = messages[-1]
     results = retrieval_chain.invoke({
-        "input": state["messages"],
+        "input": last_message.content,
     })
     
     return {'messages': [AIMessage(content= results)]}
