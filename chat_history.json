@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2025-05-25T22:05:30.725427",
+    "question": "can you summarize the entire pdf",
+    "answer": "The document is about the Transformer, a new and simple network architecture based solely on attention mechanisms. It is proposed as an alternative to complex recurrent or convolutional neural networks, which are the dominant sequence transduction models. The Transformer dispenses with recurrence and convolutions entirely, relying instead on attention mechanisms to draw global dependencies between input and output. The document discusses the model architecture, its advantages over existing models, and its application to machine translation tasks. It achieves state-of-the-art results on English-to-German and English-to-French translation tasks, while also being more parallelizable and requiring less training time. The Transformer also generalizes well to other tasks such as English constituency parsing.",
+    "time_taken_seconds": 4.606316328048706,
+    "thread_id": "5269730e-8b2f-4722-af72-5c5ecff2cbc6"
+  },
+  {
+    "timestamp": "2025-05-25T22:05:47.120021",
+    "question": "cool and tell me who are the authors of this paper",
+    "answer": "The authors of the paper are: Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, \u0141ukasz Kaiser, and Illia Polosukhin.",
+    "time_taken_seconds": 2.727046012878418,
+    "thread_id": "5269730e-8b2f-4722-af72-5c5ecff2cbc6"
+  },
+  {
+    "timestamp": "2025-05-25T22:05:58.946222",
+    "question": "hmm what was the previous question",
+    "answer": "The previous question was \"cool and tell me who are the authors of this paper\".",
+    "time_taken_seconds": 1.7706103324890137,
+    "thread_id": "5269730e-8b2f-4722-af72-5c5ecff2cbc6"
+  },
+  {
+    "timestamp": "2025-05-25T22:07:13.713167",
+    "question": "who is rahul a gowda",
+    "answer": "Rahul A Gowda is an AI Engineer with experience at URSC (ISRO), Al-Zira Technologies, and Aspire Technologies. He has a Bachelor of Engineering in Artificial Intelligence from Vemana Institute of Technology.",
+    "time_taken_seconds": 2.7378017902374268,
+    "thread_id": "fbb362d6-4795-4b94-858f-22dbb66d259f"
+  },
+  {
+    "timestamp": "2025-05-25T22:07:34.667382",
+    "question": "what is my previous question",
+    "answer": "I am sorry, I cannot fulfill this request. The documents I have access to do not contain information about past conversations.",
+    "time_taken_seconds": 2.3760013580322266,
+    "thread_id": "7f40d61f-d2d8-490a-9653-e0f865f39024"
+  },
+  {
+    "timestamp": "2025-05-25T22:07:46.023287",
+    "question": "what is my previous question",
+    "answer": "I am sorry, I cannot fulfill this request. The documents I have access to do not contain information about past conversations.",
+    "time_taken_seconds": 2.9443955421447754,
+    "thread_id": "7f40d61f-d2d8-490a-9653-e0f865f39024"
+  },
+  {
+    "timestamp": "2025-05-25T22:07:58.678500",
+    "question": "btw im rahul a gowda",
+    "answer": "Thanks for letting me know. However, I am still unable to access past conversations. Is there anything else I can help you with regarding the documents?",
+    "time_taken_seconds": 4.404590845108032,
+    "thread_id": "7f40d61f-d2d8-490a-9653-e0f865f39024"
+  },
+  {
+    "timestamp": "2025-05-25T22:08:05.085076",
+    "question": "what is my name",
+    "answer": "Your name is Rahul A Gowda.",
+    "time_taken_seconds": 4.415023326873779,
+    "thread_id": "7f40d61f-d2d8-490a-9653-e0f865f39024"
+  }
+]

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 PDFS_DIR = "pdfs" # Used for saving uploaded files
 ASSETS_DIR = "assets"
 CHAT_LOG_FILE = "chat_history.json"
+STATS_FILE = "stats.json"  # Added constant for stats file
 
 # Custom CSS for improved styling
 st.markdown("""
@@ -174,20 +175,52 @@ def initialize_directories():
         os.makedirs(ASSETS_DIR)
 
 
+def load_stats():
+    """Load statistics from the JSON file."""
+    if os.path.exists(STATS_FILE):
+        try:
+            with open(STATS_FILE, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            logger.error("Error reading stats file. Starting with empty stats.")
+    return {
+        "total_interactions": 0,
+        "total_users": 0,
+        "unique_user_threads": [],
+        "last_updated": datetime.now().isoformat()
+    }
+
+def save_stats(stats):
+    """Save statistics to the JSON file."""
+    stats["last_updated"] = datetime.now().isoformat()
+    try:
+        with open(STATS_FILE, 'w') as f:
+            json.dump(stats, f, indent=2)
+        logger.info("Statistics saved successfully")
+    except Exception as e:
+        logger.error(f"Error saving statistics: {str(e)}")
+
+def update_user_stats():
+    """Update user statistics with current session data."""
+    stats = load_stats()
+    
+    # Count current session's new interactions
+    if 'chat_history' in st.session_state:
+        current_session_interactions = len([m for m in st.session_state.chat_history if m.get("role") == "user"])
+        stats["total_interactions"] = max(stats["total_interactions"], 0) + current_session_interactions
+    
+    # Update unique users
+    current_thread = st.session_state.get('agent_thread_id', None)
+    if current_thread and current_thread not in stats["unique_user_threads"]:
+        stats["unique_user_threads"].append(current_thread)
+        stats["total_users"] = len(stats["unique_user_threads"])
+    
+    save_stats(stats)
+    return stats["total_interactions"], stats["total_users"]
+
 def get_user_stats():
     """Get statistics for the platform: total interactions and total users."""
-    total_interactions = 0
-    if 'chat_history' in st.session_state:
-        # Count pairs of user and assistant messages as interactions
-        messages = st.session_state.chat_history
-        total_interactions = len([m for m in messages if m.get("role") == "user"])
-    
-    # For this example, we'll track unique users by their thread IDs
-    total_users = 1  # Default to 1 for the current user
-    # In a real application, you would track this through a database
-    # or other persistent storage mechanism
-    
-    return total_interactions, total_users
+    return update_user_stats()
 
 # New function to interact with the LangGraph agent
 def get_agent_response(current_chat_history: list[dict], thread_id: str) -> str:
@@ -370,9 +403,11 @@ def main():
                 
                 # Calculate time taken
                 time_taken = time.time() - start_time
-                
-                # Save the interaction to JSON
+                  # Save the interaction to JSON
                 save_chat_interaction(prompt, response_text, time_taken)
+                
+                # Update and save user statistics
+                update_user_stats()
                 
                 st.markdown(response_text)
                 # Add assistant response to chat history
