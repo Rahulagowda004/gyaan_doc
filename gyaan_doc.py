@@ -300,15 +300,27 @@ def main():
 
         if uploaded_files:
             save_dir = "pdfs"
+            files_saved = False
             for uploaded_file in uploaded_files:
                 file_path = os.path.join(save_dir, uploaded_file.name)
                 try:
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
                     st.success(f"Successfully uploaded and saved {uploaded_file.name} to {save_dir}/")
+                    files_saved = True
                 except Exception as e:
                     st.error(f"Error saving {uploaded_file.name}: {e}")
-            st.info("The agent will process newly uploaded files based on its configuration.") # Simplified message
+            
+            if files_saved:
+                with st.spinner("Processing new documents..."):
+                    try:
+                        from agent import reinitialize_retriever
+                        reinitialize_retriever()
+                        st.success("Successfully processed new documents! The agent can now use them in conversations.")
+                    except Exception as e:
+                        st.error(f"Error processing new documents: {e}")
+            else:
+                st.warning("No new documents were processed.")
 
         # Show available documents - Simplified
         st.markdown("### 📚 Available Documents")

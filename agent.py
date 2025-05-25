@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__) # Added logger
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
+# Global retriever that can be updated
+global_retriever = None
+
+def reinitialize_retriever():
+    """Reinitialize the retriever with any new PDFs and update the global retriever."""
+    global global_retriever
+    global_retriever = initialize_retriever()
+    return global_retriever
+
 def initialize_retriever():
     """Loads PDFs, processes them, creates ChromaDB vector store, and returns a retriever."""
     logger.info("Initializing retriever...")
@@ -85,20 +94,22 @@ def initialize_retriever():
         # Depending on desired behavior, could raise e or return None/dummy retriever
         return None # Indicates retriever setup failed
 
-# Initialize retriever once when module is loaded
-retriever = initialize_retriever()
+# Initialize global retriever
+global_retriever = initialize_retriever()
 
 @tool
 def retriever_tool(query: str) -> str:
     """
     This tool searches and returns the information from all PDF documents in the database.
+    You must use this tool before providing any response.
     """
-    if retriever is None:
+    global global_retriever
+    if global_retriever is None:
         logger.error("Retriever is not initialized. Cannot process query.")
         return "Error: Document retriever is not available."
 
     logger.info(f"Retriever tool called with query: {query[:50]}...")
-    docs = retriever.invoke(query)
+    docs = global_retriever.invoke(query)
     
     if not docs:
         return "I found no relevant information in the available PDF documents."
@@ -121,7 +132,22 @@ def should_continue(state: AgentState):
     return hasattr(result, 'tool_calls') and len(result.tool_calls) > 0
 
 system_prompt = """
-You are an intelligent AI assistant that provides answers based solely on the content retrieved using the retriever tool. If the user asks anything related to a PDF, always use the retriever tool to fetch and reference information from the PDF before answering. Do not rely on prior knowledge or assumptions—respond strictly based on retrieved content.
+You are an intelligent AI assistant that MUST ALWAYS use the retriever tool before providing any response. Follow these rules strictly:
+
+1. ALWAYS start by using the retriever tool to search for relevant information
+2. Your first action for EVERY query must be to use the retriever tool
+3. If the retriever returns no results, try a rephrased search with different keywords
+4. Only use information found in the documents through the retriever tool
+5. DO NOT use any prior knowledge or make assumptions
+6. If after multiple attempts you cannot find relevant information, clearly state that the information is not found in the documents
+
+Your responses should follow this structure:
+1. Search the documents using the retriever tool
+2. If needed, perform additional searches with different keywords
+3. Synthesize the retrieved information into a response
+4. If no relevant information is found, clearly state this fact
+
+Remember: You must ALWAYS use the retriever tool at least once for EVERY query, regardless of the question type.
 """
 
 tools_dict = {our_tool.name: our_tool for our_tool in tools}
