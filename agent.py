@@ -147,7 +147,6 @@ def summarization(state: State) -> State:
         traceback.print_exc()
         return {"messages": [AIMessage(content=f"An error occurred during summarization: {str(e)}")]}
 
-
 ####rag agent
 retriever_instance = get_retriever()
 
@@ -163,6 +162,9 @@ def rag(state: State) -> State:
         messages = state["messages"]
         # We need to find the actual user query, not the routing decision
         # Filter out messages that contain our routing keywords
+
+        print(f"rag state messages:{messages}")
+        
         user_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
         if not user_messages:
             return {'messages': [AIMessage(content="No user query found.")]}
@@ -182,6 +184,8 @@ def rag(state: State) -> State:
             print(f"Results keys: {list(results.keys())}")
         
         # Try different ways to extract the answer
+        
+        print(f"Extracting answer from results in line 188 {results} ")
         if isinstance(results, str):
             answer = results
         elif isinstance(results, dict):
