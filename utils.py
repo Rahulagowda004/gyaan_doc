@@ -52,6 +52,10 @@ def create_vector_store():
         raise
 
 def get_retriever():
+    
+    if not os.listdir("embeddings"):
+        create_vector_store()
+        
     vector_store = Chroma(
         embedding_function=embeddings,
         persist_directory=r"embeddings",
