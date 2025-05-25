@@ -129,7 +129,25 @@ def rag(state: State) -> State:
         "input": last_message.content,
     })
     
-    return {'messages': [AIMessage(content= results)]}
+    # Print the structure of results to debug
+    print(f"Results keys: {results.keys()}")
+    
+    # Try different ways to extract the answer
+    if "answer" in results:
+        answer = results["answer"]
+    elif "result" in results:
+        answer = results["result"]
+    elif "output" in results:
+        answer = results["output"]
+    elif "response" in results:
+        answer = results["response"]
+    elif "content" in results:
+        answer = results["content"]
+    else:
+        # As a fallback, convert the entire results dict to string
+        answer = str(results)
+    
+    return {'messages': [AIMessage(content=answer)]}
 
 
 ####function helps to decide whether to go with rag or summarization
@@ -173,7 +191,7 @@ app = graph.compile(checkpointer=memory)
 ####pinging to the graph
 config = {"configurable": {"thread_id": "1"}}
 
-user_input = "what is self attention"
+user_input = "summmarize the pdf"
 
 events = app.stream(
     {"messages": [{"role": "user", "content": user_input}]},
