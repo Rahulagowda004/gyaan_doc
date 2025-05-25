@@ -2,10 +2,13 @@ import streamlit as st
 import os
 import logging
 from PIL import Image
-import uuid # Added for unique thread IDs
-from agent import app as agent_app # Added for LangGraph agent
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage # Added
-from typing import Sequence # Added for type hinting
+import uuid
+import json
+import time
+from datetime import datetime
+from agent import app as agent_app
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from typing import Sequence
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Constants
 PDFS_DIR = "pdfs" # Used for saving uploaded files
 ASSETS_DIR = "assets"
+CHAT_LOG_FILE = "chat_history.json"
 
 # Custom CSS for improved styling
 st.markdown("""
@@ -234,6 +238,37 @@ def get_agent_response(current_chat_history: list[dict], thread_id: str) -> str:
         
     return final_ai_response
 
+def load_chat_log():
+    """Load the chat log from JSON file."""
+    if os.path.exists(CHAT_LOG_FILE):
+        try:
+            with open(CHAT_LOG_FILE, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            logger.error("Error reading chat log file. Starting with empty log.")
+    return []
+
+def save_chat_interaction(question: str, answer: str, time_taken: float):
+    """Save a chat interaction to the JSON file."""
+    chat_log = load_chat_log()
+    
+    interaction = {
+        "timestamp": datetime.now().isoformat(),
+        "question": question,
+        "answer": answer,
+        "time_taken_seconds": time_taken,
+        "thread_id": st.session_state.get('agent_thread_id', 'unknown')
+    }
+    
+    chat_log.append(interaction)
+    
+    try:
+        with open(CHAT_LOG_FILE, 'w') as f:
+            json.dump(chat_log, f, indent=2)
+        logger.info(f"Saved chat interaction to {CHAT_LOG_FILE}")
+    except Exception as e:
+        logger.error(f"Error saving chat log: {str(e)}")
+
 def main():
     # Initialize
     init_session_state()
@@ -315,8 +350,18 @@ def main():
         # Get and display assistant response
         with st.chat_message("assistant", avatar="💡"):
             with st.spinner("Thinking..."):
+                # Start timing the response
+                start_time = time.time()
+                
                 # Pass the entire chat history for context
                 response_text = get_agent_response(st.session_state.chat_history, st.session_state.agent_thread_id)
+                
+                # Calculate time taken
+                time_taken = time.time() - start_time
+                
+                # Save the interaction to JSON
+                save_chat_interaction(prompt, response_text, time_taken)
+                
                 st.markdown(response_text)
                 # Add assistant response to chat history
                 st.session_state.chat_history.append({"role": "assistant", "content": response_text})
