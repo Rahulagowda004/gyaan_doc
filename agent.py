@@ -259,14 +259,20 @@ config = {"configurable": {"thread_id": "1"}}
 # Example usages
 # First try summarization
 # user_input = "what is the background of rahul a gowda"
-user_input = "summary of the attention pdf"
+# user_input = "summary of the attention pdf"
 # user_input = "explain about the architecture in attention pdf"
-print("\n===== Testing summarization =====")
-print(f"User query: {user_input}")
-events = app.stream(
-    {"messages": [HumanMessage(content=user_input)]},
-    config,
-    stream_mode="values",
-)
-for event in events:
-    event["messages"][-1].pretty_print()
+
+while True:
+    user_input = input("Enter your query (or type 'exit' to quit): ")
+    if user_input.lower() == 'exit':
+        break
+
+    print("\n===== Testing summarization =====")
+    print(f"User query: {user_input}")
+    events = app.stream(
+        {"messages": [HumanMessage(content=user_input)]},
+        config,
+        stream_mode="values",
+    )
+    for event in events:
+        event["messages"][-1].pretty_print()
