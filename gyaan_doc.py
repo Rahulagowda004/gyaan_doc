@@ -171,21 +171,19 @@ def initialize_directories():
 
 
 def get_user_stats():
-    """Get statistics for the platform: total answers, total questions, and processed documents."""
-    processed_docs_count = 0 # Simplified as PROCESSED_DOCS_FILE is removed; agent handles processing.
-                             # This count might need a new source if "processed by agent" is to be tracked.
-    
-    total_questions = 0
-    total_answers = 0
+    """Get statistics for the platform: total interactions and total users."""
+    total_interactions = 0
     if 'chat_history' in st.session_state:
-        # Chat history is now a list of dicts
-        for message in st.session_state.chat_history:
-            if message.get("role") == "user":
-                total_questions += 1
-            elif message.get("role") == "assistant":
-                total_answers += 1
+        # Count pairs of user and assistant messages as interactions
+        messages = st.session_state.chat_history
+        total_interactions = len([m for m in messages if m.get("role") == "user"])
     
-    return total_answers, total_questions, processed_docs_count
+    # For this example, we'll track unique users by their thread IDs
+    total_users = 1  # Default to 1 for the current user
+    # In a real application, you would track this through a database
+    # or other persistent storage mechanism
+    
+    return total_interactions, total_users
 
 # New function to interact with the LangGraph agent
 def get_agent_response(current_chat_history: list[dict], thread_id: str) -> str:
@@ -246,10 +244,9 @@ def main():
         # Platform Statistics as a dropdown (expander)
         with st.expander("📊 Platform Statistics", expanded=True):
             try:
-                total_answers, total_questions, processed_docs_count = get_user_stats()
-                st.markdown(f"**Total Answers:** {total_answers}")
-                st.markdown(f"**Total Questions:** {total_questions}")
-                st.markdown(f"**Processed Documents:** {processed_docs_count}")
+                total_interactions, total_users = get_user_stats()
+                st.markdown(f"**Total Interactions:** {total_interactions}")
+                st.markdown(f"**Total Users:** {total_users}")
             except Exception as e:
                 st.error(f"Could not display statistics: {str(e)}")
         
