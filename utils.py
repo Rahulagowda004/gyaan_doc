@@ -14,11 +14,11 @@ def available_pdfs() -> list:
 
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
-def retriever(pdfs: list) -> object:
-    
+def get_retriever():
+    pdfs = available_pdfs()
     for pdf in pdfs:
-        pdf_loader = PyPDFLoader(pdf)
-    
+        pdf_loader = PyPDFLoader(os.path.join("R:/gyaan_doc/pdfs", pdf))
+
     try:
         pages = pdf_loader.load()
         print(f"PDF has been loaded and has {len(pages)} pages")
