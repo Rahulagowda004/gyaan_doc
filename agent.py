@@ -46,8 +46,6 @@ def orchestrator(state: State) -> State:
         State: The updated state after processing the current step.
     """
     
-    user_message = next((msg for msg in reversed(state["messages"]) if isinstance(msg, HumanMessage)), None)
-    
     prompt = PromptTemplate(
     template="""
         You are a decision-making agent. Based on the user's query, you must select:
@@ -75,13 +73,9 @@ def orchestrator(state: State) -> State:
     
     chain = prompt | structured_llm
     
-    messages = state["messages"]
-    
-    last_message = messages[-1] if messages else None
-    
     pdfs = available_pdfs()
     response = chain.invoke({
-        'input': last_message.content, 
+        'input': state["messages"], 
         'pdfs': pdfs
     })
     
