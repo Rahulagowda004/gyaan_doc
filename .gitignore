@@ -1,3 +1,6 @@
 .env
 
-R:/gyaan_doc/embeddings/*
+embeddings/*
+embeddings/chroma.sqlite3
+embeddings/e3510d42-5f2b-49e1-b62c-f026fd523f04/*
+embeddings/e3510d42-5f2b-49e1-b62c-f026fd523f04/length.bin

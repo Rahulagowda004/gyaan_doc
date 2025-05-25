@@ -6,8 +6,18 @@ from langchain_core.messages import SystemMessage,HumanMessage,AIMessage, BaseMe
 from utils import available_pdfs
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import MemorySaver
-from typing import Annotated, Sequence, TypedDict
+from typing import Annotated, Sequence, TypedDict, Literal
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from pathlib import Path
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains.summarize import load_summarize_chain
+from langchain_community.chat_models import ChatOpenAI
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from utils import get_retriever
+from langchain import hub
 
 load_dotenv()
 
@@ -18,9 +28,6 @@ class State(TypedDict):
     
 ####llm
 llm = ChatGroq(model = "llama-3.3-70b-versatile",max_tokens=16000)
-
-from pydantic import BaseModel, Field
-from typing import Literal
 
 ####class for structured output for orchestrator
 class Parser(BaseModel):
@@ -94,11 +101,6 @@ def orchestrator(state: State) -> State:
     return {"messages": state["messages"] + [AIMessage(content=query_type)]}
 
 ####summarization agent
-from pathlib import Path
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains.summarize import load_summarize_chain
-
 def summarization(state: State) -> State:
     
     for pdf in state.get["pdfs",[]]:
@@ -121,12 +123,6 @@ def summarization(state: State) -> State:
 
 
 ####rag agent
-from langchain_community.chat_models import ChatOpenAI
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from utils import get_retriever
-from langchain import hub
-
 retriever_instance = get_retriever()
 
 def rag(state: State) -> State:
