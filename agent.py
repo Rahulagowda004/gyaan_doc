@@ -3,11 +3,10 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_core.messages import SystemMessage,HumanMessage,AIMessage, BaseMessage, ToolMessage
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import MemorySaver
 from typing import Annotated, Sequence, TypedDict, Literal
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -16,7 +15,7 @@ from langchain_core.tools import tool
 
 load_dotenv()
 
-llm = ChatGroq(model = "llama-3.3-70b-versatile",max_tokens=16000, temperature = 0)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
 
 # Our Embedding Model - has to also be compatible with the LLM
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
@@ -106,12 +105,8 @@ def should_continue(state: AgentState):
 
 
 system_prompt = """
-You are an intelligent AI assistant who answers questions about Stock Market Performance in 2024 based on the PDF document loaded into your knowledge base.
-Use the retriever tool available to answer questions about the stock market performance data. You can make multiple calls if needed.
-If you need to look up some information before asking a follow up question, you are allowed to do that!
-Please always cite the specific parts of the documents you use in your answers.
+You are an intelligent AI assistant that primarily provides answers based on content retrieved using the retriever tool. If the user asks anything related to a PDF, you must always use the retriever tool to fetch and reference information from the PDF before responding. While you can use general knowledge when needed, retrieval-based content should take priority whenever available.
 """
-
 
 tools_dict = {our_tool.name: our_tool for our_tool in tools} # Creating a dictionary of our tools
 
