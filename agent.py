@@ -12,79 +12,92 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.tools import tool
+import logging # Added for logging
 
 load_dotenv()
+logger = logging.getLogger(__name__) # Added logger
 
+# LLM and Embeddings initialized early as they are fundamental
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
-
-# Our Embedding Model - has to also be compatible with the LLM
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
-pdf_files = [f for f in os.listdir('R:/gyaan_doc/pdfs') if f.endswith('.pdf')]
+def initialize_retriever():
+    """Loads PDFs, processes them, creates ChromaDB vector store, and returns a retriever."""
+    logger.info("Initializing retriever...")
+    pdf_files_dir = 'R:/gyaan_doc/pdfs'
+    if not os.path.exists(pdf_files_dir):
+        logger.warning(f"PDFs directory not found: {pdf_files_dir}. No documents will be loaded.")
+        return None
 
-# Initialize an empty list to store all pages from all PDFs
-all_pages = []
+    pdf_files = [f for f in os.listdir(pdf_files_dir) if f.endswith('.pdf')]
+    if not pdf_files:
+        logger.warning(f"No PDF files found in directory: {pdf_files_dir}. Retriever will not be initialized.")
+        return None
+        
+    all_pages = []
 
-# Process each PDF file and accumulate all pages
-for pdf_file in pdf_files:
-    print(f"Processing PDF: {pdf_file}")
-    pdf_loader = PyPDFLoader(os.path.join("R:/gyaan_doc/pdfs", pdf_file))  # This loads the PDF with full path
+    for pdf_file in pdf_files:
+        logger.info(f"Processing PDF: {pdf_file}")
+        pdf_loader = PyPDFLoader(os.path.join(pdf_files_dir, pdf_file))
+        try:
+            pages = pdf_loader.load()
+            logger.info(f"PDF {pdf_file} loaded with {len(pages)} pages.")
+            all_pages.extend(pages)
+        except Exception as e:
+            logger.error(f"Error loading PDF {pdf_file}: {e}", exc_info=True)
+            continue
     
-    try:
-        pages = pdf_loader.load()
-        print(f"PDF {pdf_file} has been loaded and has {len(pages)} pages")
-        all_pages.extend(pages)  # Add pages from this PDF to our collection
-    except Exception as e:
-        print(f"Error loading PDF {pdf_file}: {e}")
-        # Continue processing other PDFs instead of raising exception
-        continue
+    logger.info(f"Total pages from all PDFs: {len(all_pages)}")
 
-print(f"Total pages from all PDFs: {len(all_pages)}")
+    if not all_pages: # Added check here in case all PDFs failed to load pages
+        logger.warning("No pages could be loaded from any PDF files. Retriever will not be initialized.")
+        return None
 
-# Chunking Process
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=16000,
-    chunk_overlap=750
-)
-
-# Split all documents from all PDFs
-pages_split = text_splitter.split_documents(all_pages)
-
-persist_directory = r"Agents"
-collection_name = "pdfs_embeddings"
-
-# If our collection does not exist in the directory, we create using the os command
-if not os.path.exists(persist_directory):
-    os.makedirs(persist_directory)
-
-
-try:
-    # Here, we actually create the chroma database using our embeddigns model
-    vectorstore = Chroma.from_documents(
-        documents=pages_split,
-        embedding=embeddings,
-        persist_directory=persist_directory,
-        collection_name=collection_name
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=16000,
+        chunk_overlap=750
     )
-    print(f"Created ChromaDB vector store!")
+    pages_split = text_splitter.split_documents(all_pages)
     
-except Exception as e:
-    print(f"Error setting up ChromaDB: {str(e)}")
-    raise
+    if not pages_split: # Explicitly check if pages_split is empty
+        logger.warning("No text could be extracted and split from the documents. Retriever will not be initialized.")
+        return None
 
+    persist_directory = r"Agents"
+    collection_name = "pdfs_embeddings"
+    if not os.path.exists(persist_directory):
+        os.makedirs(persist_directory)
 
-# Now we create our retriever 
-retriever = vectorstore.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 5} # K is the amount of chunks to return
-)
+    try:
+        vectorstore = Chroma.from_documents(
+            documents=pages_split, # This might be empty if no PDFs or pages
+            embedding=embeddings,
+            persist_directory=persist_directory,
+            collection_name=collection_name
+        )
+        logger.info("ChromaDB vector store created/loaded.")
+        return vectorstore.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 5}
+        )
+    except Exception as e:
+        logger.error(f"Error setting up ChromaDB: {str(e)}", exc_info=True)
+        # Depending on desired behavior, could raise e or return None/dummy retriever
+        return None # Indicates retriever setup failed
+
+# Initialize retriever once when module is loaded
+retriever = initialize_retriever()
 
 @tool
 def retriever_tool(query: str) -> str:
     """
     This tool searches and returns the information from all PDF documents in the database.
     """
+    if retriever is None:
+        logger.error("Retriever is not initialized. Cannot process query.")
+        return "Error: Document retriever is not available."
 
+    logger.info(f"Retriever tool called with query: {query[:50]}...")
     docs = retriever.invoke(query)
     
     if not docs:
@@ -96,62 +109,58 @@ def retriever_tool(query: str) -> str:
     
     return "\n\n".join(results)
 
-
 tools = [retriever_tool]
-
-llm = llm.bind_tools(tools)
+llm_with_tools = llm.bind_tools(tools) # Renamed to avoid conflict if llm is used elsewhere without tools
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
-
 
 def should_continue(state: AgentState):
     """Check if the last message contains tool calls."""
     result = state['messages'][-1]
     return hasattr(result, 'tool_calls') and len(result.tool_calls) > 0
 
-
 system_prompt = """
 You are an intelligent AI assistant that provides answers based solely on the content retrieved using the retriever tool. If the user asks anything related to a PDF, always use the retriever tool to fetch and reference information from the PDF before answering. Do not rely on prior knowledge or assumptions—respond strictly based on retrieved content.
 """
 
-tools_dict = {our_tool.name: our_tool for our_tool in tools} # Creating a dictionary of our tools
+tools_dict = {our_tool.name: our_tool for our_tool in tools}
 
-# LLM Agent
 def call_llm(state: AgentState) -> AgentState:
     """Function to call the LLM with the current state."""
     messages = list(state['messages'])
-    messages = [SystemMessage(content=system_prompt)] + messages
-    message = llm.invoke(messages)
+    # Prepend system prompt only if it's not already effectively there
+    # This basic check might need refinement for more complex histories
+    if not any(isinstance(m, SystemMessage) and m.content == system_prompt for m in messages):
+         messages = [SystemMessage(content=system_prompt)] + messages
+    
+    # Use the LLM that has tools bound to it
+    message = llm_with_tools.invoke(messages)
     return {'messages': [message]}
 
-
-# Retriever Agent
 def take_action(state: AgentState) -> AgentState:
     """Execute tool calls from the LLM's response."""
-
     tool_calls = state['messages'][-1].tool_calls
     results = []
     for t in tool_calls:
-        print(f"Calling Tool: {t['name']} with query: {t['args'].get('query', 'No query provided')}")
+        logger.info(f"Calling Tool: {t['name']} with query: {t['args'].get('query', 'No query provided')}")
         
-        if not t['name'] in tools_dict: # Checks if a valid tool is present
-            print(f"\nTool: {t['name']} does not exist.")
+        if not t['name'] in tools_dict:
+            logger.warning(f"Tool: {t['name']} does not exist.")
             result = "Incorrect Tool Name, Please Retry and Select tool from List of Available tools."
-        
         else:
-            result = tools_dict[t['name']].invoke(t['args'].get('query', ''))
-            print(f"Result length: {len(str(result))}")
+            tool_input = t['args'].get('query', '') # Ensure tool is called with its expected arg name
+            if t['name'] == retriever_tool.name and not isinstance(tool_input, str): # Basic check for retriever
+                tool_input = str(tool_input) # Ensure query is a string for retriever_tool
+            result = tools_dict[t['name']].invoke(tool_input) 
+            logger.info(f"Result length from tool {t['name']}: {len(str(result))}")
             
-
-        # Appends the Tool Message
         results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content=str(result)))
 
-    print("Tools Execution Complete. Back to the model!")
+    logger.info("Tools Execution Complete. Back to the model!")
     return {'messages': results}
 
 memory = MemorySaver()
-
 graph = StateGraph(AgentState)
 graph.add_node("llm", call_llm)
 graph.add_node("retriever_agent", take_action)
@@ -166,37 +175,17 @@ graph.set_entry_point("llm")
 
 app = graph.compile(checkpointer=memory)
 
-# config = {"configurable": {"thread_id": "1"}}
-
-# def running_agent():
-#     while True:
-#         user_input = input("Enter your query (or type 'exit' to quit): ")
-#         if user_input.lower() == 'exit':
-#             break
-# 
-#         print("\n===== Testing summarization =====")
-#         print(f"User query: {user_input}")
-#         events = app.stream(
-#             {"messages": [HumanMessage(content=user_input)]},
-#             config,
-#             stream_mode="values",
-#         )
-#         for event in events:
-#             event["messages"][-1].pretty_print()
-
-# running_agent() # Commented out to prevent execution on import
-
 if __name__ == "__main__":
     # This block will only execute if agent.py is run directly, not when imported.
-    config = {"configurable": {"thread_id": "1"}}
+    config = {"configurable": {"thread_id": "test-cli-1"}} # Use a distinct thread_id for CLI testing
     def main_test_loop():
+        logger.info("Starting agent test loop for direct execution...")
         while True:
             user_input = input("Enter your query (or type 'exit' to quit): ")
             if user_input.lower() == 'exit':
                 break
 
-            print("\n===== Agent Test Output =====")
-            print(f"User query: {user_input}")
+            logger.info(f"User query: {user_input}")
             events = app.stream(
                 {"messages": [HumanMessage(content=user_input)]},
                 config,
@@ -204,5 +193,7 @@ if __name__ == "__main__":
             )
             for event in events:
                 if event and "messages" in event and event["messages"]:
-                    event["messages"][-1].pretty_print()
+                    # Log the full message for debugging if needed
+                    # logger.debug(f"Agent event message: {event['messages'][-1]}")
+                    event["messages"][-1].pretty_print() # For CLI, pretty_print is fine
     main_test_loop()
