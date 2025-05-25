@@ -22,16 +22,24 @@ embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
 pdf_files = [f for f in os.listdir('R:/gyaan_doc/pdfs') if f.endswith('.pdf')]
 
+# Initialize an empty list to store all pages from all PDFs
+all_pages = []
+
+# Process each PDF file and accumulate all pages
 for pdf_file in pdf_files:
     print(f"Processing PDF: {pdf_file}")
-    pdf_loader = PyPDFLoader(os.path.join("pdfs", pdf_file)) # This loads the PDF
+    pdf_loader = PyPDFLoader(os.path.join("R:/gyaan_doc/pdfs", pdf_file))  # This loads the PDF with full path
+    
+    try:
+        pages = pdf_loader.load()
+        print(f"PDF {pdf_file} has been loaded and has {len(pages)} pages")
+        all_pages.extend(pages)  # Add pages from this PDF to our collection
+    except Exception as e:
+        print(f"Error loading PDF {pdf_file}: {e}")
+        # Continue processing other PDFs instead of raising exception
+        continue
 
-try:
-    pages = pdf_loader.load()
-    print(f"PDF has been loaded and has {len(pages)} pages")
-except Exception as e:
-    print(f"Error loading PDF: {e}")
-    raise
+print(f"Total pages from all PDFs: {len(all_pages)}")
 
 # Chunking Process
 text_splitter = RecursiveCharacterTextSplitter(
@@ -39,7 +47,8 @@ text_splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=750
 )
 
-pages_split = text_splitter.split_documents(pages) # We now apply this to our pages
+# Split all documents from all PDFs
+pages_split = text_splitter.split_documents(all_pages)
 
 persist_directory = r"Agents"
 collection_name = "pdfs_embeddings"
@@ -73,13 +82,13 @@ retriever = vectorstore.as_retriever(
 @tool
 def retriever_tool(query: str) -> str:
     """
-    This tool searches and returns the information from the Stock Market Performance 2024 document.
+    This tool searches and returns the information from all PDF documents in the database.
     """
 
     docs = retriever.invoke(query)
-
+    
     if not docs:
-        return "I found no relevant information in the Stock Market Performance 2024 document."
+        return "I found no relevant information in the available PDF documents."
     
     results = []
     for i, doc in enumerate(docs):
