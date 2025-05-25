@@ -276,68 +276,57 @@ def main():
                     st.success(f"Successfully uploaded and saved {uploaded_file.name} to {save_dir}/")
                 except Exception as e:
                     st.error(f"Error saving {uploaded_file.name}: {e}")
-            st.info("The agent will process newly uploaded files based on its configuration (e.g., on restart or next scheduled scan).")
+            st.info("The agent will process newly uploaded files based on its configuration.") # Simplified message
 
-        # Show processed documents - Simplified
+        # Show available documents - Simplified
         st.markdown("### 📚 Available Documents")
-        # The agent handles document interactions.
-        # You might want to add a way to list files in the 'pdfs' folder here if desired,
-        # but for now, we'll keep it simple as per the removal of the previous message.
-        st.caption("Uploaded documents will be processed by the agent.")
+        st.caption("Uploaded documents are available to the agent in the 'pdfs' directory.")
     
-    # # Main interface
-    # st.title("🔆 Gyaan AI")
-
+    # Main interface - Gyaan AI Logo
     try:
         logo_path = os.path.join(ASSETS_DIR, "GYaan_logo.jpeg")
         gyaan_logo = Image.open(logo_path)
-        st.image(gyaan_logo, width=300)
+        # Center the logo using columns
+        col1_logo, col2_logo, col3_logo = st.columns([1,2,1])
+        with col2_logo:
+            st.image(gyaan_logo, width=300)
     except Exception as e:
         st.error(f"Could not load Gyaan logo: {str(e)}")
         st.title("Gyaan AI")  # Fallback to text if image fails to load
 
+    # Main area (Chat Interface)
+    # The conditional logic for st.session_state.selected_doc has been removed.
+    # The chat interface is now always displayed.
+
+    st.info("👈 Upload documents via the sidebar. Interact with the agent below.")
+
+    st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+
+    # Display chat messages from history
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"], avatar= "🧑‍💻" if message["role"] == "user" else "💡"):
+            st.markdown(message["content"])
+
+    # Chat input
+    if prompt := st.chat_input("Ask a question..."):
+        # Add user message to chat history
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        # Display user message
+        with st.chat_message("user", avatar="🧑‍💻"):
+            st.markdown(prompt)
+        
+        # Get and display assistant response
+        with st.chat_message("assistant", avatar="💡"):
+            with st.spinner("Thinking..."):
+                # Pass the entire chat history for context
+                response_text = get_agent_response(st.session_state.chat_history, st.session_state.agent_thread_id)
+                st.markdown(response_text)
+                # Add assistant response to chat history
+                st.session_state.chat_history.append({"role": "assistant", "content": response_text})
     
-    if not st.session_state.selected_doc:
-        st.info("👈 Please interact with the agent for document-related queries.") # Updated message
-        
-        
-    else:
-        # Display current document
-        st.markdown(f"""
-            ### 📄 Current Document: {st.session_state.selected_doc['name']}
-        """)
-        
-        # Initialize chat history for current document
-        current_doc = st.session_state.selected_doc['name']
-        if current_doc not in st.session_state.chat_history:
-            st.session_state.chat_history[current_doc] = []
-        
-        # Display chat messages
-        for message in st.session_state.chat_history[current_doc]:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-        
-        # Chat input
-        if prompt := st.chat_input("Ask a question about the document..."):
-            # Add user message
-            st.session_state.chat_history[current_doc].append({
-                "role": "user",
-                "content": prompt
-            })
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            
-            # Generate and display response
-            with st.chat_message("assistant"):
-                with st.spinner("Analyzing document and generating response..."):
-                    response_text = get_agent_response(st.session_state.chat_history, st.session_state.agent_thread_id)
-                    st.markdown(response_text)
-                    st.session_state.chat_history[current_doc].append({
-                        "role": "assistant",
-                        "content": response_text
-                    })
+    st.markdown("</div>", unsafe_allow_html=True) # End chat-container
     
-    # # Footer
+    # Footer
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     try:
