@@ -14,7 +14,7 @@ def available_pdfs() -> list:
 
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
-def get_retriever():
+def create_vector_store():
     pdfs = available_pdfs()
     for pdf in pdfs:
         pdf_loader = PyPDFLoader(os.path.join("R:/gyaan_doc/pdfs", pdf))
@@ -51,7 +51,14 @@ def get_retriever():
         print(f"Error setting up ChromaDB: {str(e)}")
         raise
 
-    retriever = vectorstore.as_retriever(
+def get_retriever():
+    vector_store = Chroma(
+        embedding_function=embeddings,
+        persist_directory=r"embeddings",
+        collection_name="pdf_embeddings"
+    )
+
+    retriever = vector_store.as_retriever(
         search_type="similarity",
         search_kwargs={"k": 10}
     )
