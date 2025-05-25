@@ -7,11 +7,11 @@ import aiofiles
 from datetime import datetime
 import time
 import logging
-# from document_processor import DocumentProcessor
-# from custom_embeddings import CustomEmbedding
-# from custom_llm import get_full_response
-# from lightrag import LightRAG, QueryParam
-# from context_manager import ContextManager
+# from document_processor import DocumentProcessor # Removed
+# from custom_embeddings import CustomEmbedding # Potentially unused if LightRAG is removed
+# from custom_llm import get_full_response # Potentially unused if LightRAG is removed
+# from lightrag import LightRAG, QueryParam # Potentially unused if LightRAG is removed
+# from context_manager import ContextManager # Potentially unused if LightRAG is removed
 from PIL import Image
 import os
 import hashlib
@@ -69,12 +69,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constants
-DOCUMENTS_DIR = "documents"
-PROCESSED_DOCS_FILE = "processed_docs.json"
-UPLOAD_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"]
-EMBEDDINGS_DIM = 4096
-MAX_RETRIES = 3
-BASE_TIMEOUT = 2400  # 40 minutes
+DOCUMENTS_DIR = "documents" # This might still be used or can be removed if agent.py handles all doc locations
+# PROCESSED_DOCS_FILE = "processed_docs.json" # Removed
+UPLOAD_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt"] # May be removed if upload is fully removed
+EMBEDDINGS_DIM = 4096 # Potentially unused
+MAX_RETRIES = 3 # Potentially unused
+BASE_TIMEOUT = 2400  # 40 minutes # Potentially unused
 
 # Configure Streamlit page
 st.set_page_config(
@@ -225,20 +225,21 @@ def init_session_state():
     """Initialize Streamlit session state variables."""
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = {}
-    if 'rag_instances' not in st.session_state:
-        st.session_state.rag_instances = {}
+    # if 'rag_instances' not in st.session_state: # Removed
+    #     st.session_state.rag_instances = {} # Removed
     if 'selected_doc' not in st.session_state:
         st.session_state.selected_doc = None
-    if 'processing_status' not in st.session_state:
-        st.session_state.processing_status = {}
+    # if 'processing_status' not in st.session_state: # Removed - tied to old processing
+    #     st.session_state.processing_status = {} # Removed
 
 def initialize_directories():
     """Create necessary directories if they don't exist."""
     try:
-        os.makedirs(DOCUMENTS_DIR, exist_ok=True)
-        if not os.path.exists(PROCESSED_DOCS_FILE):
-            with open(PROCESSED_DOCS_FILE, 'w') as f:
-                json.dump([], f)
+        os.makedirs(DOCUMENTS_DIR, exist_ok=True) # Keep if DOCUMENTS_DIR is still relevant
+        os.makedirs("pdfs", exist_ok=True) # Ensure pdfs directory exists for uploads
+        # if not os.path.exists(PROCESSED_DOCS_FILE): # Removed
+        #     with open(PROCESSED_DOCS_FILE, \'w\') as f: # Removed
+        #         json.dump([], f) # Removed
         logger.info("Directories initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing directories: {str(e)}")
@@ -246,15 +247,15 @@ def initialize_directories():
 
 def get_user_stats():
     """Get statistics for the platform: total answers, total questions, and processed documents."""
-    processed_docs_count = 0
-    if os.path.exists(PROCESSED_DOCS_FILE):
-        try:
-            with open(PROCESSED_DOCS_FILE, 'r') as f:
-                docs = json.load(f)
-            processed_docs_count = len(docs)
-        except Exception as e:
-            logger.error(f"Error reading processed docs file for stats: {str(e)}")
-            pass  # Continue if stats can't be loaded
+    processed_docs_count = 0 # Simplified as PROCESSED_DOCS_FILE is removed
+    # if os.path.exists(PROCESSED_DOCS_FILE): # Removed
+    #     try: # Removed
+    #         with open(PROCESSED_DOCS_FILE, 'r') as f: # Removed
+    #             docs = json.load(f) # Removed
+    #         processed_docs_count = len(docs) # Removed
+    #     except Exception as e: # Removed
+    #         logger.error(f"Error reading processed docs file for stats: {str(e)}") # Removed
+    #         pass  # Continue if stats can't be loaded # Removed
 
     total_questions = 0
     total_answers = 0
@@ -300,402 +301,200 @@ def create_stats_chart():
     )
     return chart
 
-def load_processed_docs():
-    """Load the list of processed documents."""
-    try:
-        if os.path.exists(PROCESSED_DOCS_FILE):
-            with open(PROCESSED_DOCS_FILE, 'r') as f:
-                docs = json.load(f)
-            logger.info(f"Loaded {len(docs)} processed documents")
-            return docs
-        return []
-    except Exception as e:
-        logger.error(f"Error loading processed documents: {str(e)}")
-        return []
+# def load_processed_docs(): # Removed
+#     """Load the list of processed documents.""" # Removed
+#     try: # Removed
+#         if os.path.exists(PROCESSED_DOCS_FILE): # Removed
+#             with open(PROCESSED_DOCS_FILE, 'r') as f: # Removed
+#                 docs = json.load(f) # Removed
+#             logger.info(f"Loaded {len(docs)} processed documents") # Removed
+#             return docs # Removed
+#         return [] # Removed
+#     except Exception as e: # Removed
+#         logger.error(f"Error loading processed documents: {str(e)}") # Removed
+#         return [] # Removed
 
-def save_processed_doc(doc_info):
-    """Save information about a processed document."""
-    try:
-        docs = load_processed_docs()
-        if any(doc['name'] == doc_info['name'] for doc in docs):
-            logger.warning(f"Document {doc_info['name']} already exists")
-            return False
-        docs.append(doc_info)
-        with open(PROCESSED_DOCS_FILE, 'w') as f:
-            json.dump(docs, f)
-        logger.info(f"Document {doc_info['name']} saved successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Error saving document info: {str(e)}")
-        raise
+# def save_processed_doc(doc_info): # Removed
+#     """Save information about a processed document.""" # Removed
+#     try: # Removed
+#         docs = load_processed_docs() # Removed
+#         if any(doc['name'] == doc_info['name'] for doc in docs): # Removed
+#             logger.warning(f"Document {doc_info['name']} already exists") # Removed
+#             return False # Removed
+#         docs.append(doc_info) # Removed
+#         with open(PROCESSED_DOCS_FILE, 'w') as f: # Removed
+#             json.dump(docs, f) # Removed
+#         logger.info(f"Document {doc_info['name']} saved successfully") # Removed
+#         return True # Removed
+#     except Exception as e: # Removed
+#         logger.error(f"Error saving document info: {str(e)}") # Removed
+#         raise # Removed
 
 
-async def process_document_with_retry(rag, text, progress_bar, status_placeholder):
-    """Process document with retry logic and increasing timeouts."""
-    for attempt in range(MAX_RETRIES):
-        timeout = BASE_TIMEOUT * (attempt + 1)
-        try:
-            print(f"\n=== Processing Attempt {attempt + 1}/{MAX_RETRIES} ===")
-            print(f"Timeout: {timeout} seconds")
+# async def process_document_with_retry(rag, text, progress_bar, status_placeholder): # Removed
+#     """Process document with retry logic and increasing timeouts.""" # Removed
+#     for attempt in range(MAX_RETRIES): # Removed
+#         timeout = BASE_TIMEOUT * (attempt + 1) # Removed
+#         try: # Removed
+#             print(f"\\n=== Processing Attempt {attempt + 1}/{MAX_RETRIES} ===") # Removed
+#             print(f"Timeout: {timeout} seconds") # Removed
             
-            status_placeholder.info(f"Processing attempt {attempt + 1}/{MAX_RETRIES} (timeout: {timeout}s)")
-            result = await asyncio.wait_for(
-                rag.ainsert(text),
-                timeout=timeout
-            )
-            logger.info("Document processed successfully")
-            print("Document processing successful")
-            return result
-        except asyncio.TimeoutError:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Processing timeout on attempt {attempt + 1}")
-                print(f"Timeout occurred - Retrying...")
-                status_placeholder.warning(f"Processing timeout, attempt {attempt + 1} of {MAX_RETRIES}. Increasing timeout and retrying...")
-                await asyncio.sleep(5)
-            else:
-                error_msg = "Document processing failed after maximum retries"
-                logger.error(error_msg)
-                print(f"=== Error ===\n{error_msg}")
-                raise Exception(error_msg)
-        except Exception as e:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(f"Processing error on attempt {attempt + 1}: {str(e)}")
-                print(f"Error occurred: {str(e)} - Retrying...")
-                status_placeholder.warning(f"Processing error: {str(e)}. Retrying...")
-                await asyncio.sleep(5)
-            else:
-                error_msg = f"Document processing failed after maximum retries: {str(e)}"
-                logger.error(error_msg)
-                print(f"=== Error ===\n{error_msg}")
-                raise Exception(error_msg)
+#             status_placeholder.info(f"Processing attempt {attempt + 1}/{MAX_RETRIES} (timeout: {timeout}s)") # Removed
+#             result = await asyncio.wait_for( # Removed
+#                 rag.ainsert(text), # Removed
+#                 timeout=timeout # Removed
+#             ) # Removed
+#             logger.info("Document processed successfully") # Removed
+#             print("Document processing successful") # Removed
+#             return result # Removed
+#         except asyncio.TimeoutError: # Removed
+#             if attempt < MAX_RETRIES - 1: # Removed
+#                 logger.warning(f"Processing timeout on attempt {attempt + 1}") # Removed
+#                 print(f"Timeout occurred - Retrying...") # Removed
+#                 status_placeholder.warning(f"Processing timeout, attempt {attempt + 1} of {MAX_RETRIES}. Increasing timeout and retrying...") # Removed
+#                 await asyncio.sleep(5) # Removed
+#             else: # Removed
+#                 error_msg = "Document processing failed after maximum retries" # Removed
+#                 logger.error(error_msg) # Removed
+#                 print(f"=== Error ===\\n{error_msg}") # Removed
+#                 raise Exception(error_msg) # Removed
+#         except Exception as e: # Removed
+#             if attempt < MAX_RETRIES - 1: # Removed
+#                 logger.warning(f"Processing error on attempt {attempt + 1}: {str(e)}") # Removed
+#                 print(f"Error occurred: {str(e)} - Retrying...") # Removed
+#                 status_placeholder.warning(f"Processing error: {str(e)}. Retrying...") # Removed
+#                 await asyncio.sleep(5) # Removed
+#             else: # Removed
+#                 error_msg = f"Document processing failed after maximum retries: {str(e)}" # Removed
+#                 logger.error(error_msg) # Removed
+#                 print(f"=== Error ===\\n{error_msg}") # Removed
+#                 raise Exception(error_msg) # Removed
 
-async def process_document(uploaded_file, progress_bar, status_placeholder):
-    """Process an uploaded document and create LightRAG instance."""
-    try:
-        logger.info(f"Starting to process document: {uploaded_file.name}")
-        print(f"\n=== Processing Document ===\nFile: {uploaded_file.name}")
+# async def process_document(uploaded_file, progress_bar, status_placeholder): # Removed
+#     """Process an uploaded document and create LightRAG instance.""" # Removed
+#     try: # Removed
+#         logger.info(f"Starting to process document: {uploaded_file.name}") # Removed
+#         print(f"\\n=== Processing Document ===\\nFile: {uploaded_file.name}") # Removed
         
-        # Update progress
-        progress_bar.progress(10, text="Reading file...")
+#         # Update progress # Removed
+#         progress_bar.progress(10, text="Reading file...") # Removed
         
-        # Read file content
-        content = uploaded_file.read()
-        logger.info(f"File read successfully, size: {len(content)} bytes")
-        print(f"File read successfully - Size: {len(content)} bytes")
+#         # Read file content # Removed
+#         content = uploaded_file.read() # Removed
+#         logger.info(f"File read successfully, size: {len(content)} bytes") # Removed
+#         print(f"File read successfully - Size: {len(content)} bytes") # Removed
         
-        # Process document
-        progress_bar.progress(20, text="Extracting text...")
-        doc_processor = DocumentProcessor()
-        extracted_text = doc_processor.process_document(content, uploaded_file.name)
-        logger.info(f"Text extracted successfully, length: {len(extracted_text)}")
-        print(f"Text extracted - Length: {len(extracted_text)} characters")
+#         # Process document # Removed
+#         progress_bar.progress(20, text="Extracting text...") # Removed
+#         # doc_processor = DocumentProcessor() # This was the source of the error, DocumentProcessor is not defined # Removed
+#         # extracted_text = doc_processor.process_document(content, uploaded_file.name) # Removed
+#         extracted_text = "Dummy text, processing removed" # Placeholder if needed, but function is removed # Removed
+#         logger.info(f"Text extracted successfully, length: {len(extracted_text)}") # Removed
+#         print(f"Text extracted - Length: {len(extracted_text)} characters") # Removed
         
-        # Save processed document
-        doc_path = os.path.join(DOCUMENTS_DIR, uploaded_file.name)
-        with open(doc_path, 'wb') as f:
-            f.write(content)
+#         # Save processed document # Removed
+#         doc_path = os.path.join(DOCUMENTS_DIR, uploaded_file.name) # Removed
+#         with open(doc_path, 'wb') as f: # Removed
+#             f.write(content) # Removed
         
-        # Save text content
-        text_path = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}.txt")
-        async with aiofiles.open(text_path, mode='w') as f:
-            await f.write(extracted_text)
-        logger.info(f"Document saved to: {doc_path}")
-        print(f"Document saved to: {doc_path}")
+#         # Save text content # Removed
+#         text_path = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}.txt") # Removed
+#         async with aiofiles.open(text_path, mode='w') as f: # Removed
+#             await f.write(extracted_text) # Removed
+#         logger.info(f"Document saved to: {doc_path}") # Removed
+#         print(f"Document saved to: {doc_path}") # Removed
         
-        # Initialize LightRAG
-        progress_bar.progress(40, text="Initializing LightRAG...")
-        doc_dir = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}_rag")
-        os.makedirs(doc_dir, exist_ok=True)
-        rag = initialize_lightrag(doc_dir)
+#         # Initialize LightRAG # Removed
+#         progress_bar.progress(40, text="Initializing LightRAG...") # Removed
+#         doc_dir = os.path.join(DOCUMENTS_DIR, f"{uploaded_file.name}_rag") # Removed
+#         os.makedirs(doc_dir, exist_ok=True) # Removed
+#         rag = initialize_lightrag(doc_dir) # Removed
         
-        # Process document with LightRAG
-        progress_bar.progress(60, text="Processing with LightRAG...")
-        status_placeholder.info("Starting document processing with LightRAG. This may take several minutes...")
+#         # Process document with LightRAG # Removed
+#         progress_bar.progress(60, text="Processing with LightRAG...") # Removed
+#         status_placeholder.info("Starting document processing with LightRAG. This may take several minutes...") # Removed
         
-        await process_document_with_retry(rag, extracted_text, progress_bar, status_placeholder)
+#         await process_document_with_retry(rag, extracted_text, progress_bar, status_placeholder) # Removed
         
-        # Save document info
-        progress_bar.progress(80, text="Saving document information...")
-        doc_info = {
-            "name": uploaded_file.name,
-            "path": doc_path,
-            "text_path": text_path,
-            "rag_dir": doc_dir,
-            "processed_date": datetime.now().isoformat()
-        }
+#         # Save document info # Removed
+#         progress_bar.progress(80, text="Saving document information...") # Removed
+#         doc_info = { # Removed
+#             "name": uploaded_file.name, # Removed
+#             "path": doc_path, # Removed
+#             "text_path": text_path, # Removed
+#             "rag_dir": doc_dir, # Removed
+#             "processed_date": datetime.now().isoformat() # Removed
+#         } # Removed
         
-        if not save_processed_doc(doc_info):
-            return False, "Document already exists!"
+#         if not save_processed_doc(doc_info): # Removed
+#             return False, "Document already exists!" # Removed
         
-        # Store RAG instance
-        st.session_state.rag_instances[uploaded_file.name] = rag
+#         # Store RAG instance # Removed
+#         st.session_state.rag_instances[uploaded_file.name] = rag # Removed
         
-        progress_bar.progress(100, text="Complete!")
-        logger.info(f"Document {uploaded_file.name} processed successfully")
-        print("Document processing completed successfully")
-        return True, "Document processed successfully!"
+#         progress_bar.progress(100, text="Complete!") # Removed
+#         logger.info(f"Document {uploaded_file.name} processed successfully") # Removed
+#         print("Document processing completed successfully") # Removed
+#         return True, "Document processed successfully!" # Removed
         
-    except Exception as e:
-        error_msg = f"Error processing document: {str(e)}"
-        logger.error(error_msg)
-        print(f"\n=== Error ===\n{error_msg}")
-        return False, error_msg
+#     except Exception as e: # Removed
+#         error_msg = f"Error processing document: {str(e)}" # Removed
+#         logger.error(error_msg) # Removed
+#         print(f"\\n=== Error ===\\n{error_msg}") # Removed
+#         return False, error_msg # Removed
 
-def initialize_lightrag(working_dir):
-    """Initialize LightRAG with optimized parameters"""
-    try:
-        logger.info(f"Initializing LightRAG in directory: {working_dir}")
-        print(f"\n=== Initializing LightRAG ===\nWorking Directory: {working_dir}")
+# def initialize_lightrag(working_dir): # Removed
+#     """Initialize LightRAG with optimized parameters""" # Removed
+#     try: # Removed
+#         logger.info(f"Initializing LightRAG in directory: {working_dir}") # Removed
+#         print(f"\\n=== Initializing LightRAG ===\\nWorking Directory: {working_dir}") # Removed
         
-        custom_embed = CustomEmbedding(timeout=BASE_TIMEOUT)
-        custom_embed.embedding_dim = EMBEDDINGS_DIM  # Ensure embedding_dim is accessible
+#         # custom_embed = CustomEmbedding(timeout=BASE_TIMEOUT) # Removed - CustomEmbedding not defined
+#         # custom_embed.embedding_dim = EMBEDDINGS_DIM  # Ensure embedding_dim is accessible # Removed
         
-        rag = LightRAG(
-            working_dir=working_dir,
-            llm_model_func=get_full_response,
-            embedding_func=custom_embed,
-            llm_model_name="ibnzterrell/Meta-Llama-3.3-70B-Instruct-AWQ-INT4",
-            node2vec_params={
-                "dimensions": EMBEDDINGS_DIM,
-                "num_walks": 15,
-                "walk_length": 50,
-                "window_size": 3,
-                "iterations": 4,
-                "random_seed": 3,
-            },
-            vector_db_storage_cls_kwargs={
-                "embedding_dim": EMBEDDINGS_DIM,
-            },
-        )
-        logger.info("LightRAG initialized successfully")
-        print("LightRAG initialization successful")
-        return rag
-    except Exception as e:
-        error_msg = f"Error initializing LightRAG: {str(e)}"
-        logger.error(error_msg)
-        print(f"=== Error ===\n{error_msg}")
-        raise
-        logger.info("LightRAG initialized successfully")
-        print("LightRAG initialization successful")
-        return rag
-    except Exception as e:
-        error_msg = f"Error initializing LightRAG: {str(e)}"
-        logger.error(error_msg)
-        print(f"=== Error ===\n{error_msg}")
-        raise
-        logger.info("LightRAG initialized successfully")
-        print("LightRAG initialization successful")
-        return rag
-    except Exception as e:
-        error_msg = f"Error initializing LightRAG: {str(e)}"
-        logger.error(error_msg)
-        print(f"=== Error ===\n{error_msg}")
-        raise
+#         # rag = LightRAG( # Removed - LightRAG not defined
+#         #     working_dir=working_dir, # Removed
+#         #     llm_model_func=get_full_response, # Removed - get_full_response not defined
+#         #     embedding_func=custom_embed, # Removed
+#         #     llm_model_name="ibnzterrell/Meta-Llama-3.3-70B-Instruct-AWQ-INT4", # Removed
+#         #     node2vec_params={ # Removed
+#         #         "dimensions": EMBEDDINGS_DIM, # Removed
+#         #         "num_walks": 15, # Removed
+#         #         "walk_length": 50, # Removed
+#         #         "window_size": 3, # Removed
+#         #         "iterations": 4, # Removed
+#         #         "random_seed": 3, # Removed
+#         #     }, # Removed
+#         #     vector_db_storage_cls_kwargs={ # Removed
+#         #         "embedding_dim": EMBEDDINGS_DIM, # Removed
+#         #     }, # Removed
+#         # ) # Removed
+#         logger.info("LightRAG initialized successfully (stubbed)") # Removed
+#         print("LightRAG initialization successful (stubbed)") # Removed
+#         # return rag # Removed
+#         return None # Placeholder since function is removed # Removed
+#     except Exception as e: # Removed
+#         error_msg = f"Error initializing LightRAG: {str(e)}" # Removed
+#         logger.error(error_msg) # Removed
+#         print(f"=== Error ===\\n{error_msg}") # Removed
+#         raise # Removed
 
-async def generate_response(prompt, selected_doc, conversation_history=None):
-    """Generate response using enhanced context retrieval"""
-    try:
-        logger.info(f"Generating response for document: {selected_doc['name']}")
-        context_manager = ContextManager(max_tokens=4096)
-        
-        # Initialize/get RAG instance
-        if selected_doc["name"] not in st.session_state.rag_instances:
-            logger.info("Initializing new RAG instance")
-            rag = initialize_lightrag(selected_doc["rag_dir"])
-            st.session_state.rag_instances[selected_doc["name"]] = rag
-        else:
-            logger.info("Using existing RAG instance")
-            rag = st.session_state.rag_instances[selected_doc["name"]]
 
-        # Optimize query parameters
-        context_param = QueryParam(
-            mode="hybrid",
-            top_k=60,                    # Reduced from 10 to 5
-            max_token_for_text_unit=4000,
-            max_token_for_global_context=2000,
-            max_token_for_local_context=2000,
-            only_need_context=True
-        )
+# async def generate_response(prompt, selected_doc, conversation_history=None): # Removed
+#     """Generate response using enhanced context retrieval""" # Removed
+#     try: # Removed
+#         logger.info(f"Generating response for document: {selected_doc['name']} (stubbed)") # Removed
+#         # This function relies on LightRAG and related components which are being removed. # Removed
+#         # For now, it will return a placeholder response. # Removed
+#         # You will need to integrate with agent.py for actual responses. # Removed
+#         await asyncio.sleep(1) # Simulate async work # Removed
+#         return f"Response generation for '{prompt}' on doc '{selected_doc['name']}' is not implemented in gyaan_doc.py anymore." # Removed
         
-        # Get context from LightRAG
-        context_response = await rag.aquery(prompt, param=context_param)
-        
-        # Process context sections
-        context_sections = []
-        
-        # 1. Add document metadata
-        context_sections.append(f"Document: {selected_doc['name']}")
-        
-        # 2. Process text content from context response
-        if isinstance(context_response, str):
-            # Split the content on ----- markers
-            content_parts = context_response.split('-----')
-            
-            # Look for content part
-            text_content = None
-            for part in content_parts:
-                if 'Content' in part:
-                    text_content = part.replace('Content', '').strip()
-                    break
-            
-            if text_content:
-                # Split into manageable chunks
-                chunks = text_content.split('\n\n')
-                chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
-                
-                # Get top 10 most relevant chunks
-                processed_chunks = []
-                for i, chunk in enumerate(chunks[:10], 1):
-                    processed_chunks.append(f"[Excerpt {i}]\n{chunk}")
-                
-                # Truncate chunks to stay within token limits
-                truncated_chunks = context_manager.truncate_context(processed_chunks)
-                if truncated_chunks:
-                    context_sections.append("Relevant Document Sections:\n" + "\n\n".join(truncated_chunks))
-        
-        # 3. Add entities and relationships
-        er_context = context_manager.extract_entities_relationships(context_response)
-        if er_context:
-            context_sections.append(er_context)
-        
-        # Combine all context
-        context_text = "\n\n".join(context_sections)
-        
-        # Create augmented prompt
-        augmented_prompt = context_manager.create_augmented_prompt(
-            selected_doc['name'],
-            context_text,
-            prompt
-        )
-        
-        # Log context and prompt for debugging
-        logger.info(f"Context Length: {len(context_text)}")
-        logger.debug(f"Augmented Prompt: {augmented_prompt}")
-        
-        # Get response
-        response = await get_full_response(augmented_prompt, max_tokens=4096)
-        return response
-        
-    except Exception as e:
-        error_msg = f"Error generating response: {str(e)}"
-        logger.error(error_msg)
-        print(f"\n=== Error ===\n{error_msg}")
-        return error_msg
-   
-
-# async def generate_response(prompt, selected_doc, conversation_history=None):
-#     try:
-#         logger.info(f"Generating response for document: {selected_doc['name']}")
-        
-#         # Initialize/get RAG instance
-#         if selected_doc["name"] not in st.session_state.rag_instances:
-#             logger.info("Initializing new RAG instance")
-#             rag = initialize_lightrag(selected_doc["rag_dir"])
-#             st.session_state.rag_instances[selected_doc["name"]] = rag
-#         else:
-#             logger.info("Using existing RAG instance")
-#             rag = st.session_state.rag_instances[selected_doc["name"]]
-
-#         # Get initial context
-#         context_param = QueryParam(
-#             mode="hybrid",
-#             top_k=10,
-#             max_token_for_text_unit=2000,
-#             max_token_for_global_context=2000,
-#             max_token_for_local_context=2000,
-#             only_need_context=True
-#         )
-        
-#         # Get context from LightRAG
-#         context_response = await rag.aquery(prompt, param=context_param)
-#         print("\n=== Initial Context ===")
-#         print(context_response)
-        
-#         # Process and filter context
-#         context_parts = []
-        
-#         # Handle string response
-#         if isinstance(context_response, str):
-#             # Extract entities
-#             if '-----Entities-----' in context_response:
-#                 entities_text = context_response.split('-----Entities-----')[1].split('-----Relationships-----')[0]
-#                 entities = []
-                
-#                 for line in entities_text.split('\n'):
-#                     if '"' in line and ',' in line and not line.startswith('id'):
-#                         try:
-#                             # Split by quotes to get entity and description
-#                             parts = line.split('"')
-#                             if len(parts) >= 5:
-#                                 entity = parts[1]
-#                                 description = parts[3]
-#                                 # Get rank from last comma-separated value
-#                                 rank = float(line.split(',')[-1].strip())
-#                                 entities.append((rank, f"- {entity}: {description}"))
-#                         except:
-#                             continue
-                
-#                 # Add top 3 entities
-#                 if entities:
-#                     entities.sort(key=lambda x: x[0], reverse=True)
-#                     top_entities = [e[1] for e in entities[:20]]
-#                     context_parts.append("Key Concepts:\n" + "\n".join(top_entities))
-            
-#             # Extract relationships
-#             if '-----Relationships-----' in context_response:
-#                 relations_text = context_response.split('-----Relationships-----')[1]
-#                 if '-----' in relations_text:
-#                     relations_text = relations_text.split('-----')[0]
-#                 relations = []
-                
-#                 for line in relations_text.split('\n'):
-#                     if '"' in line and ',' in line and not line.startswith('id'):
-#                         try:
-#                             # Split by quotes to get description
-#                             parts = line.split('"')
-#                             if len(parts) >= 6:
-#                                 description = parts[5]
-#                                 # Get rank (third from last comma-separated value)
-#                                 comma_parts = line.split(',')
-#                                 rank = float(comma_parts[-3].strip())
-#                                 relations.append((rank, f"- {description}"))
-#                         except:
-#                             continue
-                
-#                 # Add top 2 relationships
-#                 if relations:
-#                     relations.sort(key=lambda x: x[0], reverse=True)
-#                     top_relations = [r[1] for r in relations[:20]]
-#                     context_parts.append("Key Findings:\n" + "\n".join(top_relations))
-        
-#         # Combine the filtered context
-#         context_text = "\n\n".join(context_parts)
-        
-#         print("\n=== Final Context ===")
-#         print(f"Context Length: {len(context_text)}")
-#         print("Context Preview:")
-#         print(context_text[:500])
-        
-#         # Create augmented prompt
-#         augmented_prompt = f"""I am analyzing the document {selected_doc['name']}. Here is the key information from the document:
-
-# {context_text}
-
-# Based only on the information provided above, please {prompt}. If certain aspects are not covered in this context, please mention that explicitly."""
-
-#         print("\n=== Final Augmented Prompt ===")
-#         print(augmented_prompt)
-
-#         # Get response
-#         response = await get_full_response(augmented_prompt, max_tokens=4096, kwargs={})
-#         return response
-        
-#     except Exception as e:
-#         error_msg = f"Error generating response: {str(e)}"
-#         logger.error(error_msg)
-#         print(f"\n=== Error ===\n{error_msg}")
-#         return error_msg
-
+#     except Exception as e: # Removed
+#         error_msg = f"Error generating response: {str(e)}" # Removed
+#         logger.error(error_msg) # Removed
+#         print(f"\\n=== Error ===\\n{error_msg}") # Removed
+#         return error_msg # Removed
 def main():
     # Initialize
     init_session_state()
@@ -717,62 +516,31 @@ def main():
         
         # Upload section
         st.markdown("### 📥 Upload Document")
-        uploaded_file = st.file_uploader(
-            "Upload a document",
-            type=[ext.replace(".", "") for ext in UPLOAD_EXTENSIONS],
-            help="Supported formats: PDF, DOCX, DOC, TXT"
+        uploaded_files = st.file_uploader(
+            "Upload PDF or DOCX files",
+            type=["pdf", "docx"],
+            accept_multiple_files=True,
+            help="Upload one or more PDF or DOCX files. These will be placed in the 'pdfs' directory for the agent to process."
         )
-        
-        # Process uploaded file
-        if uploaded_file is not None:
-            if any(doc['name'] == uploaded_file.name for doc in load_processed_docs()):
-                st.error(f"Document '{uploaded_file.name}' already exists!")
-            else:
+
+        if uploaded_files:
+            save_dir = "pdfs"
+            for uploaded_file in uploaded_files:
+                file_path = os.path.join(save_dir, uploaded_file.name)
                 try:
-                    progress_placeholder = st.empty()
-                    progress_bar = progress_placeholder.progress(0)
-                    status_placeholder = st.empty()
-                    
-                    with st.spinner("Processing document..."):
-                        success, message = asyncio.run(
-                            process_document(uploaded_file, progress_bar, status_placeholder)
-                        )
-                        
-                        progress_placeholder.empty()
-                        
-                        if success:
-                            status_placeholder.success(message)
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            status_placeholder.error(message)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    st.success(f"Successfully uploaded and saved {uploaded_file.name} to {save_dir}/")
                 except Exception as e:
-                    logger.error(f"Document processing error: {str(e)}")
-                    st.error(f"An error occurred: {str(e)}")
-        
-        # Show processed documents
+                    st.error(f"Error saving {uploaded_file.name}: {e}")
+            st.info("The agent will process newly uploaded files based on its configuration (e.g., on restart or next scheduled scan).")
+
+        # Show processed documents - Simplified
         st.markdown("### 📚 Available Documents")
-        processed_docs = load_processed_docs()
-        
-        if not processed_docs:
-            st.info("No documents available. Please upload a document to begin.")
-        else:
-            # Radio button selection for documents
-            doc_options = ["None"] + [doc["name"] for doc in processed_docs]
-            selected_doc_name = st.radio(
-                "Select a document to chat with:",
-                options=doc_options,
-                index=0,
-                format_func=lambda x: x if x == "None" else f"📄 {x}"
-            )
-            
-            if selected_doc_name != "None":
-                st.session_state.selected_doc = next(
-                    (doc for doc in processed_docs if doc["name"] == selected_doc_name),
-                    None
-                )
-            else:
-                st.session_state.selected_doc = None
+        # The agent handles document interactions.
+        # You might want to add a way to list files in the 'pdfs' folder here if desired,
+        # but for now, we'll keep it simple as per the removal of the previous message.
+        st.caption("Uploaded documents will be processed by the agent.")
     
     # # Main interface
     # st.title("🔆 Gyaan AI")
@@ -787,8 +555,7 @@ def main():
 
     
     if not st.session_state.selected_doc:
-        st.info("👈 Please select a document from the sidebar to start chatting.")
-        
+        st.info("👈 Please interact with the agent for document-related queries.") # Updated message
         
         
     else:
@@ -820,13 +587,14 @@ def main():
             # Generate and display response
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing document and generating response..."):
-                    response = asyncio.run(
-                        generate_response(
-                            prompt, 
-                            st.session_state.selected_doc,
-                            st.session_state.chat_history[current_doc]
-                        )
-                    )
+                    # response = asyncio.run( # Call to generate_response is removed
+                    #     generate_response( 
+                    #         prompt, 
+                    #         st.session_state.selected_doc,
+                    #         st.session_state.chat_history[current_doc]
+                    #     )
+                    # )
+                    response = "Response generation has been moved to the agent." # Placeholder
                     st.markdown(response)
                     st.session_state.chat_history[current_doc].append({
                         "role": "assistant",
