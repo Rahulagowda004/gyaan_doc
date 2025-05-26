@@ -315,6 +315,13 @@ def get_user_docs_dir(username: str) -> str:
         os.makedirs(user_dir)
     return user_dir
 
+def create_temporary_success_message(message: str, container):
+    """Create a success message that disappears after 3 seconds."""
+    placeholder = container.empty()
+    placeholder.success(message)
+    time.sleep(3)
+    placeholder.empty()
+
 def handle_document_upload(uploaded_files, username: str):
     """Handle document upload for a specific user."""
     if not uploaded_files:
@@ -323,12 +330,15 @@ def handle_document_upload(uploaded_files, username: str):
     user_docs_dir = get_user_docs_dir(username)
     files_saved = False
     
+    # Create a container for temporary messages
+    message_container = st.empty()
+    
     for uploaded_file in uploaded_files:
         file_path = os.path.join(user_docs_dir, uploaded_file.name)
         try:
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success(f"Successfully uploaded {uploaded_file.name}")
+            create_temporary_success_message(f"Successfully uploaded {uploaded_file.name}", message_container)
             files_saved = True
         except Exception as e:
             st.error(f"Error saving {uploaded_file.name}: {e}")
@@ -340,7 +350,7 @@ def handle_document_upload(uploaded_files, username: str):
                 from agent import reinitialize_retriever, set_tools_context
                 set_tools_context(username)  # Set the context for tools
                 reinitialize_retriever(username)
-                st.success("Successfully processed new documents!")
+                create_temporary_success_message("Successfully processed new documents!", message_container)
             except Exception as e:
                 st.error(f"Error processing documents: {e}")
                 logger.error(f"Error processing documents for user {username}: {e}")
