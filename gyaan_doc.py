@@ -161,10 +161,16 @@ st.markdown("""
 def init_session_state():
     """Initialize Streamlit session state variables."""
     if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []  # Global chat history
-    
-    if 'agent_thread_id' not in st.session_state: # Added for agent conversation threading
+        st.session_state.chat_history = []
+    if 'agent_thread_id' not in st.session_state:
         st.session_state.agent_thread_id = str(uuid.uuid4())
+    if 'username' not in st.session_state:
+        st.session_state.username = f"user_{uuid.uuid4().hex[:8]}"
+        # Initialize retriever for new user
+        from agent import reinitialize_retriever, set_tools_context
+        set_tools_context(st.session_state.username)
+        reinitialize_retriever(st.session_state.username)
+
 
 # Create necessary directories
 def initialize_directories():
@@ -302,10 +308,57 @@ def save_chat_interaction(question: str, answer: str, time_taken: float):
     except Exception as e:
         logger.error(f"Error saving chat log: {str(e)}")
 
+def get_user_docs_dir(username: str) -> str:
+    """Get the user-specific documents directory."""
+    user_dir = os.path.join(PDFS_DIR, username)
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+    return user_dir
+
+def handle_document_upload(uploaded_files, username: str):
+    """Handle document upload for a specific user."""
+    if not uploaded_files:
+        return False
+
+    user_docs_dir = get_user_docs_dir(username)
+    files_saved = False
+    
+    for uploaded_file in uploaded_files:
+        file_path = os.path.join(user_docs_dir, uploaded_file.name)
+        try:
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.success(f"Successfully uploaded {uploaded_file.name}")
+            files_saved = True
+        except Exception as e:
+            st.error(f"Error saving {uploaded_file.name}: {e}")
+            logger.error(f"Error saving file for user {username}: {e}")
+    
+    if files_saved:
+        with st.spinner("Processing new documents..."):
+            try:
+                from agent import reinitialize_retriever, set_tools_context
+                set_tools_context(username)  # Set the context for tools
+                reinitialize_retriever(username)
+                st.success("Successfully processed new documents!")
+            except Exception as e:
+                st.error(f"Error processing documents: {e}")
+                logger.error(f"Error processing documents for user {username}: {e}")
+    
+    return files_saved
+
 def main():
     # Initialize
     init_session_state()
     initialize_directories()
+    
+    # Get or set username (you can modify this based on your authentication system)
+    if 'username' not in st.session_state:
+        st.session_state.username = f"user_{uuid.uuid4().hex[:8]}"
+    
+    # Set the tools context for the current user
+    from agent import set_tools_context
+    set_tools_context(st.session_state.username)
     
     # Sidebar
     with st.sidebar:
@@ -322,43 +375,28 @@ def main():
 
         st.markdown("### 📚 Document Manager")
         
-        # Upload section
+        # Modified upload section
         st.markdown("### 📥 Upload Document")
         uploaded_files = st.file_uploader(
             "Upload PDF or DOCX files",
             type=["pdf", "docx"],
             accept_multiple_files=True,
-            help="Upload one or more PDF or DOCX files. These will be placed in the 'pdfs' directory for the agent to process."
+            key=f"uploader_{st.session_state.username}",  # Unique key per user
+            help="Upload one or more PDF or DOCX files"
         )
 
         if uploaded_files:
-            save_dir = "pdfs"
-            files_saved = False
-            for uploaded_file in uploaded_files:
-                file_path = os.path.join(save_dir, uploaded_file.name)
-                try:
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    st.success(f"Successfully uploaded and saved {uploaded_file.name} to {save_dir}/")
-                    files_saved = True
-                except Exception as e:
-                    st.error(f"Error saving {uploaded_file.name}: {e}")
-            
-            if files_saved:
-                with st.spinner("Processing new documents..."):
-                    try:
-                        from agent import reinitialize_retriever
-                        reinitialize_retriever()
-                        st.success("Successfully processed new documents! The agent can now use them in conversations.")
-                    except Exception as e:
-                        st.error(f"Error processing new documents: {e}")
-            else:
-                st.warning("No new documents were processed.")
+            handle_document_upload(uploaded_files, st.session_state.username)
 
-        # Show available documents - Simplified
-        st.markdown("### 📚 Available Documents")
-        st.caption("Uploaded documents are available to the agent in the 'pdfs' directory.")
-    
+        # Show available documents - User specific
+        st.markdown("### 📚 Your Documents")
+        user_docs = os.listdir(get_user_docs_dir(st.session_state.username))
+        if user_docs:
+            for doc in user_docs:
+                st.text(f"📄 {doc}")
+        else:
+            st.info("No documents uploaded yet")
+
     # Main interface - Gyaan AI Logo
     try:
         logo_path = os.path.join(ASSETS_DIR, "GYaan_logo.jpeg")

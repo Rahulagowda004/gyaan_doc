@@ -21,45 +21,50 @@ logger = logging.getLogger(__name__) # Added logger
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
 embeddings = OllamaEmbeddings(model = "all-minilm:latest")
 
-# Global retriever that can be updated
-global_retriever = None
+# Global retriever dictionary to store user-specific retrievers
+global_retrievers = {}
 
-def reinitialize_retriever():
-    """Reinitialize the retriever with any new PDFs and update the global retriever."""
-    global global_retriever
-    global_retriever = initialize_retriever()
-    return global_retriever
+def get_user_retriever(username: str):
+    """Get or create a retriever for a specific user."""
+    global global_retrievers
+    if username not in global_retrievers:
+        global_retrievers[username] = initialize_retriever(username)
+    return global_retrievers[username]
 
-def initialize_retriever():
-    """Loads PDFs, processes them, creates ChromaDB vector store, and returns a retriever."""
-    logger.info("Initializing retriever...")
-    pdf_files_dir = 'R:/gyaan_doc/pdfs'
+def reinitialize_retriever(username: str):
+    """Reinitialize the retriever for a specific user."""
+    global global_retrievers
+    global_retrievers[username] = initialize_retriever(username)
+    return global_retrievers[username]
+
+def initialize_retriever(username: str):
+    """Loads PDFs, processes them, creates ChromaDB vector store for a specific user."""
+    logger.info(f"Initializing retriever for user: {username}")
+    pdf_files_dir = os.path.join('R:/gyaan_doc/pdfs', username)
     if not os.path.exists(pdf_files_dir):
-        logger.warning(f"PDFs directory not found: {pdf_files_dir}. No documents will be loaded.")
+        logger.warning(f"PDFs directory not found for user {username}: {pdf_files_dir}")
         return None
 
     pdf_files = [f for f in os.listdir(pdf_files_dir) if f.endswith('.pdf')]
     if not pdf_files:
-        logger.warning(f"No PDF files found in directory: {pdf_files_dir}. Retriever will not be initialized.")
+        logger.warning(f"No PDF files found for user {username}")
         return None
         
     all_pages = []
 
     for pdf_file in pdf_files:
-        logger.info(f"Processing PDF: {pdf_file}")
+        logger.info(f"Processing PDF for user {username}: {pdf_file}")
         pdf_loader = PyPDFLoader(os.path.join(pdf_files_dir, pdf_file))
         try:
             pages = pdf_loader.load()
-            logger.info(f"PDF {pdf_file} loaded with {len(pages)} pages.")
             all_pages.extend(pages)
         except Exception as e:
-            logger.error(f"Error loading PDF {pdf_file}: {e}", exc_info=True)
+            logger.error(f"Error loading PDF {pdf_file} for user {username}: {e}", exc_info=True)
             continue
-    
-    logger.info(f"Total pages from all PDFs: {len(all_pages)}")
 
-    if not all_pages: # Added check here in case all PDFs failed to load pages
-        logger.warning("No pages could be loaded from any PDF files. Retriever will not be initialized.")
+    logger.info(f"Total pages from all PDFs for user {username}: {len(all_pages)}")
+
+    if not all_pages:
         return None
 
     text_splitter = RecursiveCharacterTextSplitter(
@@ -68,34 +73,29 @@ def initialize_retriever():
     )
     pages_split = text_splitter.split_documents(all_pages)
     
-    if not pages_split: # Explicitly check if pages_split is empty
-        logger.warning("No text could be extracted and split from the documents. Retriever will not be initialized.")
+    if not pages_split:
         return None
 
-    persist_directory = r"Agents"
-    collection_name = "pdfs_embeddings"
+    persist_directory = os.path.join("Agents", username)
+    collection_name = f"pdfs_embeddings_{username}"
     if not os.path.exists(persist_directory):
         os.makedirs(persist_directory)
 
     try:
         vectorstore = Chroma.from_documents(
-            documents=pages_split, # This might be empty if no PDFs or pages
+            documents=pages_split,
             embedding=embeddings,
             persist_directory=persist_directory,
             collection_name=collection_name
         )
-        logger.info("ChromaDB vector store created/loaded.")
+        logger.info(f"ChromaDB vector store created/loaded for user {username}.")
         return vectorstore.as_retriever(
             search_type="similarity",
             search_kwargs={"k": 5}
         )
     except Exception as e:
-        logger.error(f"Error setting up ChromaDB: {str(e)}", exc_info=True)
-        # Depending on desired behavior, could raise e or return None/dummy retriever
-        return None # Indicates retriever setup failed
-
-# Initialize global retriever
-global_retriever = initialize_retriever()
+        logger.error(f"Error setting up ChromaDB for user {username}: {str(e)}", exc_info=True)
+        return None
 
 @tool
 def retriever_tool(query: str) -> str:
@@ -103,13 +103,16 @@ def retriever_tool(query: str) -> str:
     This tool searches and returns the information from all PDF documents in the database.
     You must use this tool before providing any response.
     """
-    global global_retriever
-    if global_retriever is None:
-        logger.error("Retriever is not initialized. Cannot process query.")
+    # Get username from the tool's context (passed through config)
+    username = tools_context.get('username', 'default')
+    retriever = get_user_retriever(username)
+    
+    if retriever is None:
+        logger.error(f"Retriever is not initialized for user: {username}")
         return "Error: Document retriever is not available."
 
-    logger.info(f"Retriever tool called with query: {query[:50]}...")
-    docs = global_retriever.invoke(query)
+    logger.info(f"Retriever tool called by user {username} with query: {query[:50]}...")
+    docs = retriever.invoke(query)
     
     if not docs:
         return "I found no relevant information in the available PDF documents."
@@ -120,8 +123,17 @@ def retriever_tool(query: str) -> str:
     
     return "\n\n".join(results)
 
+# Initialize tools context
+tools_context = {'username': 'default'}
+
+def set_tools_context(username: str):
+    """Set the context for tools to use."""
+    global tools_context
+    tools_context['username'] = username
+
+# Remove duplicate retriever_tool and global_retriever initialization
 tools = [retriever_tool]
-llm_with_tools = llm.bind_tools(tools) # Renamed to avoid conflict if llm is used elsewhere without tools
+llm_with_tools = llm.bind_tools(tools)
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
@@ -200,6 +212,9 @@ graph.add_edge("retriever_agent", "llm")
 graph.set_entry_point("llm")
 
 app = graph.compile(checkpointer=memory)
+
+# Export the app at the end of the file
+__all__ = ['app', 'set_tools_context', 'reinitialize_retriever']
 
 if __name__ == "__main__":
     # This block will only execute if agent.py is run directly, not when imported.
