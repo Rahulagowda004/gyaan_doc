@@ -153,6 +153,87 @@ st.markdown("""
         margin: 1rem 0;
         border-left: 4px solid #3B82F6;
     }
+
+    /* Override Streamlit's default sidebar width and position */
+    [data-testid="stSidebar"] {
+        min-width: 300px !important;
+        max-width: 300px !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        height: 100vh !important;
+        background: #000000 !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 1.5rem !important;
+        overflow-y: auto !important;
+        color: white !important;
+    }
+
+    /* Style sidebar content */
+    [data-testid="stSidebar"] [data-testid="stMarkdown"] {
+        color: white !important;
+    }
+
+    /* Style sidebar headings */
+    [data-testid="stSidebar"] h3 {
+        color: white !important;
+        margin-top: 1.5rem !important;
+    }
+
+    /* Style file uploader in sidebar */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 2px dashed rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        padding: 1rem !important;
+        color: white !important;
+    }
+
+    /* Style document list in sidebar */
+    [data-testid="stSidebar"] .element-container {
+        color: white !important;
+    }
+
+    /* Sidebar text elements */
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    /* Style the expandable sections in sidebar */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: white !important;
+    }
+
+    /* Adjust main content */
+    .main {
+        margin-left: 300px !important;
+        padding: 2rem !important;
+        background-color: white !important;
+    }
+
+    /* Enhanced sidebar styling */
+    .sidebar-header {
+        margin-bottom: 2rem !important;
+        padding-bottom: 1rem !important;
+        border-bottom: 2px solid #e2e8f0 !important;
+    }
+
+    /* Ensure sidebar content is well-spaced */
+    [data-testid="stSidebar"] [data-testid="stMarkdown"] {
+        margin-bottom: 1.5rem !important;
+    }
+
+    /* Make file uploader more prominent */
+    [data-testid="stFileUploader"] {
+        padding: 1.5rem !important;
+        border: 2px dashed #cbd5e1 !important;
+        border-radius: 8px !important;
+        background-color: #ffffff !important;
+        margin: 1rem 0 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -382,16 +463,14 @@ def main():
                 st.error(f"Could not display statistics: {str(e)}")
         
         st.markdown("---") # Add a visual separator
-
-        st.markdown("### 📚 Document Manager")
         
-        # Modified upload section
+        # Modified upload section - removed redundant Document Manager heading
         st.markdown("### 📥 Upload Document")
         uploaded_files = st.file_uploader(
             "Upload PDF or DOCX files",
             type=["pdf", "docx"],
             accept_multiple_files=True,
-            key=f"uploader_{st.session_state.username}",  # Unique key per user
+            key=f"uploader_{st.session_state.username}",
             help="Upload one or more PDF or DOCX files"
         )
 
