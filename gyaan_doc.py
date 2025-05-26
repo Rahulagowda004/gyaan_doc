@@ -164,7 +164,7 @@ st.markdown("""
         height: 100vh !important;
         background: #000000 !important;
         border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-        padding: 1.5rem !important;
+        padding: 0.5rem 0.7rem 0.5rem 0.7rem !important; /* Even less padding */
         overflow-y: auto !important;
         color: white !important;
     }
@@ -172,39 +172,55 @@ st.markdown("""
     /* Style sidebar content */
     [data-testid="stSidebar"] [data-testid="stMarkdown"] {
         color: white !important;
+        margin-bottom: 0.2rem !important;
+        margin-top: 0.2rem !important;
+        line-height: 1.2 !important;
     }
 
     /* Style sidebar headings */
     [data-testid="stSidebar"] h3 {
         color: white !important;
-        margin-top: 1.5rem !important;
+        margin-top: 0.4rem !important;
+        margin-bottom: 0.2rem !important;
+        font-size: 1.1rem !important;
+        line-height: 1.2 !important;
     }
 
     /* Style file uploader in sidebar */
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
-        background: rgba(255, 255, 255, 0.1) !important;
-        border: 2px dashed rgba(255, 255, 255, 0.2) !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 2px dashed rgba(255, 255, 255, 0.13) !important;
         border-radius: 8px !important;
-        padding: 1rem !important;
+        padding: 0.3rem !important;
         color: white !important;
+        margin-bottom: 0.3rem !important;
+        margin-top: 0.3rem !important;
     }
 
     /* Style document list in sidebar */
     [data-testid="stSidebar"] .element-container {
         color: white !important;
+        margin-bottom: 0.2rem !important;
+        margin-top: 0.2rem !important;
     }
 
     /* Sidebar text elements */
     [data-testid="stSidebar"] .stMarkdown p {
         color: rgba(255, 255, 255, 0.8) !important;
+        margin-bottom: 0.1rem !important;
+        margin-top: 0.1rem !important;
+        line-height: 1.2 !important;
     }
 
     /* Style the expandable sections in sidebar */
     [data-testid="stSidebar"] [data-testid="stExpander"] {
-        background: rgba(255, 255, 255, 0.05) !important;
+        background: rgba(255, 255, 255, 0.03) !important;
         border: none !important;
         border-radius: 8px !important;
         color: white !important;
+        margin-bottom: 0.3rem !important;
+        margin-top: 0.3rem !important;
+        padding: 0.2rem !important;
     }
 
     /* Adjust main content */
@@ -216,23 +232,15 @@ st.markdown("""
 
     /* Enhanced sidebar styling */
     .sidebar-header {
-        margin-bottom: 2rem !important;
-        padding-bottom: 1rem !important;
+        margin-bottom: 0.5rem !important;
+        padding-bottom: 0.2rem !important;
         border-bottom: 2px solid #e2e8f0 !important;
     }
 
-    /* Ensure sidebar content is well-spaced */
-    [data-testid="stSidebar"] [data-testid="stMarkdown"] {
-        margin-bottom: 1.5rem !important;
-    }
-
-    /* Make file uploader more prominent */
-    [data-testid="stFileUploader"] {
-        padding: 1.5rem !important;
-        border: 2px dashed #cbd5e1 !important;
-        border-radius: 8px !important;
-        background-color: #ffffff !important;
-        margin: 1rem 0 !important;
+    /* Remove extra hr/--- spacing in sidebar */
+    [data-testid="stSidebar"] hr {
+        margin-top: 0.3rem !important;
+        margin-bottom: 0.3rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
